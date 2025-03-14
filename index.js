@@ -125,6 +125,62 @@ async function updateMapping(originalPath, newPath, target, name, expiry) {
   await KV_BINDING.put(newPath, JSON.stringify(mapping));
 }
 
+// 检查过期映射并发送邮件通知
+async function checkExpiredMappings(env) {
+  const expiredMappings = [];
+  let cursor = null;
+  const now = new Date();
+
+  do {
+    const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
+
+    for (const key of listResult.keys) {
+      const mapping = await KV_BINDING.get(key.name, { type: "json" });
+      if (mapping && mapping.expiry && new Date(mapping.expiry) < now) {
+        expiredMappings.push({
+          path: key.name,
+          ...mapping
+        });
+        // 删除过期映射
+        await KV_BINDING.delete(key.name);
+      }
+    }
+
+    cursor = listResult.cursor;
+  } while (cursor);
+
+  if (expiredMappings.length > 0) {
+    // 构建邮件内容
+    const emailContent = expiredMappings.map(m => `
+路径: ${m.path}
+目标URL: ${m.target}
+名称: ${m.name || '无'}
+过期时间: ${m.expiry}
+`).join('\n-------------------\n');
+
+    const message = new EmailMessage(
+      `no-reply@${env.DOMAIN}`,
+      env.ADMIN_EMAIL,
+      `From: URL Shortener <no-reply@${env.DOMAIN}>
+To: ${env.ADMIN_EMAIL}
+Subject: 短链接过期通知
+Content-Type: text/plain; charset=utf-8
+
+以下短链接已过期并被自动删除：
+
+${emailContent}`
+    );
+
+    try {
+      await env.EMAIL_BINDING.send(message);
+    } catch (error) {
+      console.error('发送邮件通知失败:', error);
+    }
+  }
+
+  return expiredMappings;
+}
+
 export default {
   async fetch(request, env) {
     KV_BINDING = env.KV_BINDING;
@@ -236,6 +292,14 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    console.log("cron processed");
+    KV_BINDING = env.KV_BINDING;
+    console.log("开始检查过期的短链接...");
+
+    try {
+      const expiredMappings = await checkExpiredMappings(env);
+      console.log(`检查完成，共删除 ${expiredMappings.length} 个过期短链接`);
+    } catch (error) {
+      console.error('清理过期短链接时发生错误:', error);
+    }
   },
 };

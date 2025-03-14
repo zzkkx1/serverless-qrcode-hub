@@ -11,9 +11,13 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "core-js-pure",
       "esbuild",
       "sharp",
       "workerd"
     ]
+  },
+  "dependencies": {
+    "mimetext": "^3.0.27"
   }
 }
