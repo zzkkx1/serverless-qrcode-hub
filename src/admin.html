@@ -31,6 +31,24 @@
 </head>
 
 <body>
+    <!-- 添加模态对话框 HTML 在 body 开始处 -->
+    <dialog id="qr-modal" class="modal">
+        <div class="modal-box">
+            <form method="dialog">
+                <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+            </form>
+            <h3 class="font-bold text-lg mb-4">二维码</h3>
+            <div id="qr-container" class="flex justify-center mb-4"></div>
+            <div class="modal-action gap-4">
+                <button id="qr-download" class="btn btn-primary">下载二维码</button>
+                <button class="btn" onclick="document.getElementById('qr-modal').close()">关闭</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>关闭</button>
+        </form>
+    </dialog>
+
     <div id="alertContainer" class="fixed left-1/2 transform -translate-x-1/2 z-50"></div>
     <div class="navbar bg-base-100 shadow-lg rounded-box mb-8">
         <div class="flex-1">
@@ -363,94 +381,60 @@
                 }
             }
 
+            // 修改生成二维码的函数
             function generateQRForMapping(url) {
+                const modal = document.getElementById('qr-modal');
+                const container = document.getElementById('qr-container');
+                const downloadBtn = document.getElementById('qr-download');
+
+                // 清空之前的内容
+                container.innerHTML = '';
+
+                // 创建新的二维码
                 const qrCode = new QRCodeStyling({
-                    width: 400,
-                    height: 400,
+                    width: 300,
+                    height: 300,
                     type: 'canvas',
                     data: url,
-                    dotsOptions: { color: '#000000' },
-                    backgroundOptions: { color: '#ffffff' },
+                    dotsOptions: {
+                        color: getComputedStyle(document.documentElement)
+                            .getPropertyValue('--primary')
+                            .trim() || '#000000',
+                        type: 'rounded'
+                    },
+                    backgroundOptions: {
+                        color: getComputedStyle(document.documentElement)
+                            .getPropertyValue('--base-100')
+                            .trim() || '#ffffff'
+                    },
                     imageOptions: {
                         hideBackgroundDots: true,
                         imageSize: 0.3,
                         margin: 5
                     },
-                    image: "/wechat.svg"  // 这里使用您稍后提供的 SVG 图标路径
+                    image: "/wechat.svg"
                 });
 
-                const canvas = document.createElement('canvas');
-                qrCode.append(canvas);
+                // 将二维码添加到容器中
+                qrCode.append(container);
 
-                const fileName = new Date().toISOString()
-                    .replace(/[:.]/g, '-')
-                    .replace('T', '_')
-                    .replace('Z', '');
+                // 更新下载按钮点击事件
+                downloadBtn.onclick = () => {
+                    const fileName = 'qr-' + new Date().toISOString()
+                        .replace(/[:.]/g, '-')
+                        .replace('T', '_')
+                        .replace('Z', '');
+                    qrCode.download({
+                        name: fileName,
+                        extension: 'png'
+                    });
+                };
 
-                qrCode.download({
-                    name: 'qr-' + fileName,
-                    extension: 'png'
-                });
+                // 显示模态框
+                modal.showModal();
             }
 
-            function logout() {
-                fetch('/admin/logout', { method: 'POST' }).then(() => {
-                    window.location.href = '/login';
-                });
-            }
-
-            let allMappings = [];
-            let currentPage = 1;
-            let pageSize = 10;
-
-            async function loadMappings() {
-                const loading = document.getElementById('loading');
-                loading.classList.remove('hidden');
-
-                try {
-                    const response = await fetch(`/admin/mappings?page=${currentPage}&pageSize=${pageSize}`);
-
-                    if (response.status === 401) {
-                        window.location.href = '/login';
-                        return;
-                    }
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        allMappings = Object.entries(data.mappings);
-                        renderCurrentPage();
-
-                        // 更新分页信息
-                        currentPage = data.page;
-                        const totalPages = data.totalPages;
-                        document.getElementById('currentPage').textContent = currentPage;
-                        document.getElementById('prevPage').disabled = currentPage === 1;
-                        document.getElementById('nextPage').disabled = currentPage === totalPages;
-                    }
-                } catch (error) {
-                    console.error('加载数据失败:', error);
-                    alert('加载数据失败，请刷新页面重试');
-                } finally {
-                    loading.classList.add('hidden');
-                }
-            }
-
-            function renderCurrentPage() {
-                const table = document.getElementById('mappingsTableBody');
-                const fragment = document.createDocumentFragment();
-
-                const start = (currentPage - 1) * pageSize;
-                const end = Math.min(start + pageSize, allMappings.length);
-
-                for (let i = start; i < end; i++) {
-                    const [path, mapping] = allMappings[i];
-                    const row = createMappingRow(path, mapping);
-                    fragment.appendChild(row);
-                }
-
-                table.appendChild(fragment);
-            }
-
+            // 修改创建映射行的函数中的二维码按钮部分
             function createMappingRow(path, mapping) {
                 const row = document.createElement('tr');
 
@@ -473,7 +457,7 @@
                 const buttons = [
                     { text: '编辑', class: 'btn btn-warning btn-sm mr-2', handler: () => toggleEditMode(row) },
                     { text: '删除', class: 'btn btn-error btn-sm mr-2', handler: () => deleteMapping(path) },
-                    { text: '生成二维码', class: 'btn btn-info btn-sm', handler: () => generateQRForMapping(window.location.origin + '/' + path) }
+                    { text: '二维码', class: 'btn btn-info btn-sm', handler: () => generateQRForMapping(window.location.origin + '/' + path) }
                 ];
 
                 buttons.forEach(({ text, class: className, handler }) => {
@@ -618,6 +602,64 @@
                 } else {
                     iconPath.setAttribute('d', 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z');
                 }
+            }
+
+            let allMappings = [];
+            let currentPage = 1;
+            let pageSize = 10;
+
+            async function loadMappings() {
+                const loading = document.getElementById('loading');
+                loading.classList.remove('hidden');
+
+                try {
+                    const response = await fetch(`/admin/mappings?page=${currentPage}&pageSize=${pageSize}`);
+
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        allMappings = Object.entries(data.mappings);
+                        renderCurrentPage();
+
+                        // 更新分页信息
+                        currentPage = data.page;
+                        const totalPages = data.totalPages;
+                        document.getElementById('currentPage').textContent = currentPage;
+                        document.getElementById('prevPage').disabled = currentPage === 1;
+                        document.getElementById('nextPage').disabled = currentPage === totalPages;
+                    }
+                } catch (error) {
+                    console.error('加载数据失败:', error);
+                    alert('加载数据失败，请刷新页面重试');
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            }
+
+            function renderCurrentPage() {
+                const table = document.getElementById('mappingsTableBody');
+                const fragment = document.createDocumentFragment();
+
+                const start = (currentPage - 1) * pageSize;
+                const end = Math.min(start + pageSize, allMappings.length);
+
+                for (let i = start; i < end; i++) {
+                    const [path, mapping] = allMappings[i];
+                    const row = createMappingRow(path, mapping);
+                    fragment.appendChild(row);
+                }
+
+                table.appendChild(fragment);
+            }
+
+            function logout() {
+                fetch('/admin/logout', { method: 'POST' }).then(() => {
+                    window.location.href = '/login';
+                });
             }
 
             // 初始加载
