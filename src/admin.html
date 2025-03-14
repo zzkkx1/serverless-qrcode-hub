@@ -31,6 +31,7 @@
 </head>
 
 <body>
+    <div id="alertContainer" class="fixed left-1/2 transform -translate-x-1/2 z-50"></div>
     <div class="navbar bg-base-100 shadow-lg rounded-box mb-8">
         <div class="flex-1">
             <h1 class="text-2xl font-bold text-primary">管理面板</h1>
@@ -73,6 +74,41 @@
             <div id="loading" class="text-center py-4 hidden">
                 <span class="loading loading-spinner loading-lg"></span>
             </div>
+
+            <!-- 新的添加表单区域 -->
+            <div class="card bg-base-200 p-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label for="newName" class="floating-label">
+                            <span class="label-text">名称，例:音乐群1</span>
+                            <input type="text" id="newName" placeholder="名称，例:音乐群1" class="input input-md">
+                        </label>
+                    </div>
+                    <div>
+                        <label for="newPath" class="floating-label">
+                            <span class="label-text">短链接，例:music1</span>
+                            <input type="text" id="newPath" placeholder="短链接，例:music1" class="input input-md">
+                        </label>
+                    </div>
+                    <div>
+                        <label for="newTarget" class="floating-label">
+                            <span class="label-text">目标URL，例:https://x.com/xxx</span>
+                            <input type="text" id="newTarget" placeholder="目标URL，例:https://x.com/xxx"
+                                class="input input-md">
+                        </label>
+                    </div>
+                    <div>
+                        <label for="newExpiry" class="floating-label">
+                            <span class="label-text">失效日期</span>
+                            <input type="date" id="newExpiry" class="input input-md">
+                        </label>
+                        <div class="flex gap-2">
+                            <button id="addMappingBtn" class="btn btn-primary">添加</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="overflow-x-auto">
                 <table class="table table-zebra w-full">
                     <thead>
@@ -85,16 +121,6 @@
                         </tr>
                     </thead>
                     <tbody id="mappingsTableBody">
-                        <tr id="addNewRow">
-                            <td><input type="text" id="newName" placeholder="例如: 官网链接"
-                                    class="input input-bordered w-full"></td>
-                            <td><input type="text" id="newPath" placeholder="例如: url1"
-                                    class="input input-bordered w-full"></td>
-                            <td><input type="text" id="newTarget" placeholder="https://target.com/xxx"
-                                    class="input input-bordered w-full"></td>
-                            <td><input type="date" id="newExpiry" class="input input-bordered w-full"></td>
-                            <td><button id="addMappingBtn" class="btn btn-primary btn-sm">添加</button></td>
-                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -163,7 +189,7 @@
 
                 const file = files[0];
                 if (!file.type.startsWith('image/')) {
-                    alert('请上传图片文件');
+                    showAlert('请上传图片文件');
                     return;
                 }
 
@@ -195,18 +221,17 @@
                         const decodedText = result.text;
                         document.getElementById('decoded-text').textContent = decodedText;
                         qrResult.classList.remove('hidden');
-                        
+
                         // 自动填充到目标 URL 输入框
                         document.getElementById('newTarget').value = decodedText;
-                        // 滚动到添加映射区域
-                        document.getElementById('addNewRow').scrollIntoView({ behavior: 'smooth' });
+                        showAlert('二维码识别成功', 'success');
                     } else {
-                        alert('未能识别二维码，请确保图片清晰且包含有效的二维码');
+                        showAlert('未能识别二维码，请确保图片清晰且包含有效的二维码');
                         qrResult.classList.add('hidden');
                     }
                 } catch (error) {
                     console.error('二维码识别错误:', error);
-                    alert('二维码识别失败，请确保图片清晰且包含有效的二维码');
+                    showAlert('二维码识别失败，请确保图片清晰且包含有效的二维码');
                     document.getElementById('qr-result').classList.add('hidden');
                 }
             }
@@ -219,32 +244,105 @@
                         document.getElementById('newTarget').value = text;
                         // 滚动到添加映射区域
                         document.getElementById('addNewRow').scrollIntoView({ behavior: 'smooth' });
+                        showAlert('复制成功', 'success');
                     })
                     .catch(err => {
                         console.error('复制失败:', err);
-                        alert('复制失败，请手动复制');
+                        showAlert('复制失败，请手动复制');
                     });
             }
 
+            // 添加显示警告的函数
+            function showAlert(message, type = 'error') {
+                const alertContainer = document.getElementById('alertContainer');
+                const alert = document.createElement('div');
+
+                // 设置警告类型样式
+                const alertClass = type === 'error' ? 'alert alert-error' : 'alert alert-success';
+                alert.className = `${alertClass} mb-4 shadow-lg min-w-[300px]`;
+
+                // 创建警告内容
+                alert.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                d="${type === 'error'
+                        ? 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+                        : 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'}"/>
+                        </svg>
+                        <span>${message}</span>
+                    </div>
+                `;
+
+                // 添加到容器，并设置初始透明度
+                alert.style.opacity = '0';
+                alertContainer.appendChild(alert);
+
+                // 淡入效果
+                setTimeout(() => {
+                    alert.style.transition = 'opacity 0.3s ease-in-out';
+                    alert.style.opacity = '1';
+                }, 10);
+
+                // 3秒后淡出并移除
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 300);
+                }, 3000);
+            }
+
+            // 修改 addMapping 函数中的错误提示
             async function addMapping() {
-                const name = document.getElementById('newName').value;
-                const path = document.getElementById('newPath').value;
-                const target = document.getElementById('newTarget').value;
+                const name = document.getElementById('newName').value.trim();
+                const path = document.getElementById('newPath').value.trim();
+                const target = document.getElementById('newTarget').value.trim();
                 const expiry = document.getElementById('newExpiry').value;
 
-                const response = await fetch('/admin/mapping', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, path, target, expiry })
-                });
-
-                if (response.status === 401) {
-                    window.location.href = '/login';
+                // 输入验证
+                if (!name) {
+                    showAlert('请输入名称');
                     return;
                 }
+                if (!path) {
+                    showAlert('请输入短链接');
+                    return;
+                }
+                if (!/^[a-zA-Z0-9-_]+$/.test(path)) {
+                    showAlert('短链接只能包含字母、数字、下划线和横线');
+                    return;
+                }
+                if (!target) {
+                    showAlert('请输入目标 URL');
+                    return;
+                }
+                // if (!target.startsWith('http://') && !target.startsWith('https://')) {
+                //     showAlert('目标 URL 必须以 http:// 或 https:// 开头');
+                //     return;
+                // }
 
-                if (response.ok) {
+                try {
+                    const response = await fetch('/admin/mapping', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, path, target, expiry })
+                    });
+
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        showAlert(error.message || '添加失败，请重试');
+                        return;
+                    }
+
+                    showAlert('添加成功', 'success');
                     location.reload();
+                } catch (error) {
+                    console.error('添加映射失败:', error);
+                    showAlert('添加失败，请检查网络连接后重试');
                 }
             }
 
@@ -308,20 +406,20 @@
             async function loadMappings() {
                 const loading = document.getElementById('loading');
                 loading.classList.remove('hidden');
-                
+
                 try {
                     const response = await fetch(`/admin/mappings?page=${currentPage}&pageSize=${pageSize}`);
-                    
+
                     if (response.status === 401) {
                         window.location.href = '/login';
                         return;
                     }
-                    
+
                     if (response.ok) {
                         const data = await response.json();
                         allMappings = Object.entries(data.mappings);
                         renderCurrentPage();
-                        
+
                         // 更新分页信息
                         currentPage = data.page;
                         const totalPages = data.totalPages;
@@ -339,31 +437,23 @@
 
             function renderCurrentPage() {
                 const table = document.getElementById('mappingsTableBody');
-                const addNewRow = document.getElementById('addNewRow');
                 const fragment = document.createDocumentFragment();
-                
-                // 清除现有行，保留添加新映射的行
-                while (table.firstChild) {
-                    table.removeChild(table.firstChild);
-                }
-                
+
                 const start = (currentPage - 1) * pageSize;
                 const end = Math.min(start + pageSize, allMappings.length);
-                
+
                 for (let i = start; i < end; i++) {
                     const [path, mapping] = allMappings[i];
                     const row = createMappingRow(path, mapping);
                     fragment.appendChild(row);
                 }
-                
-                // 添加新映射的行
-                fragment.appendChild(addNewRow);
+
                 table.appendChild(fragment);
             }
 
             function createMappingRow(path, mapping) {
                 const row = document.createElement('tr');
-                
+
                 // 使用数组和 map 来优化单元格创建
                 const cellsData = [
                     { text: mapping.name || '-', data: mapping.name || '-' },
@@ -371,21 +461,21 @@
                     { text: mapping.target, data: mapping.target },
                     { text: mapping.expiry || '永久有效', data: mapping.expiry || '' }
                 ];
-                
+
                 cellsData.forEach(({ text, data }) => {
                     const cell = document.createElement('td');
                     cell.textContent = text;
                     cell.dataset.original = data;
                     row.appendChild(cell);
                 });
-                
+
                 const actionsCell = document.createElement('td');
                 const buttons = [
                     { text: '编辑', class: 'btn btn-warning btn-sm mr-2', handler: () => toggleEditMode(row) },
                     { text: '删除', class: 'btn btn-error btn-sm mr-2', handler: () => deleteMapping(path) },
                     { text: '生成二维码', class: 'btn btn-info btn-sm', handler: () => generateQRForMapping(window.location.origin + '/' + path) }
                 ];
-                
+
                 buttons.forEach(({ text, class: className, handler }) => {
                     const button = document.createElement('button');
                     button.textContent = text;
@@ -393,7 +483,7 @@
                     button.onclick = handler;
                     actionsCell.appendChild(button);
                 });
-                
+
                 row.appendChild(actionsCell);
                 return row;
             }
@@ -410,7 +500,7 @@
                     cells[1].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[1].dataset.original}">`;
                     cells[2].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[2].dataset.original}">`;
                     cells[3].innerHTML = `<input type="date" class="input input-bordered input-sm w-full" value="${cells[3].dataset.original}">`;
-                    
+
                     const editButton = cells[4].children[0];
                     editButton.textContent = '保存';
                     editButton.className = 'btn btn-success btn-sm mr-2';
@@ -422,7 +512,7 @@
                     const newExpiry = cells[3].querySelector('input').value;
 
                     // 检查是否有任何修改
-                    const hasChanges = 
+                    const hasChanges =
                         newName !== cells[0].dataset.original ||
                         newPath !== cells[1].dataset.original ||
                         newTarget !== cells[2].dataset.original ||
@@ -453,32 +543,61 @@
                 cells[1].textContent = cells[1].dataset.original;
                 cells[2].textContent = cells[2].dataset.original;
                 cells[3].textContent = cells[3].dataset.original || '永久有效';
-                
+
                 const editButton = cells[4].children[0];
                 editButton.textContent = '编辑';
                 editButton.className = 'btn btn-warning btn-sm mr-2';
-                
+
                 row.classList.remove('editing');
             }
 
-            // 添加更新映射的函数
+            // 修改 updateMapping 函数中的错误提示
             async function updateMapping(mapping) {
-                const response = await fetch('/admin/mapping', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(mapping)
-                });
-
-                if (response.status === 401) {
-                    window.location.href = '/login';
+                // 输入验证
+                if (!mapping.name) {
+                    showAlert('请输入名称');
                     return;
                 }
+                if (!mapping.path) {
+                    showAlert('请输入短链接');
+                    return;
+                }
+                if (!/^[a-zA-Z0-9-_]+$/.test(mapping.path)) {
+                    showAlert('短链接只能包含字母、数字、下划线和横线');
+                    return;
+                }
+                if (!mapping.target) {
+                    showAlert('请输入目标 URL');
+                    return;
+                }
+                // if (!mapping.target.startsWith('http://') && !mapping.target.startsWith('https://')) {
+                //     showAlert('目标 URL 必须以 http:// 或 https:// 开头');
+                //     return;
+                // }
 
-                if (response.ok) {
+                try {
+                    const response = await fetch('/admin/mapping', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(mapping)
+                    });
+
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        showAlert(error.message || '更新失败，请重试');
+                        return;
+                    }
+
+                    showAlert('更新成功', 'success');
                     location.reload();
-                } else {
-                    alert('更新失败，请重试');
-                    location.reload();
+                } catch (error) {
+                    console.error('更新映射失败:', error);
+                    showAlert('更新失败，请检查网络连接后重试');
                 }
             }
 

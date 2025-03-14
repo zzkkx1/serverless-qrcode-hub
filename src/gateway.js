@@ -64,12 +64,12 @@ async function createMapping(path, target, name, expiry) {
     throw new Error('Invalid input');
   }
 
-  // 验证 URL 格式
-  try {
-    new URL(target);
-  } catch (e) {
-    throw new Error('Invalid target URL');
-  }
+  // // 验证 URL 格式
+  // try {
+  //   new URL(target);
+  // } catch (e) {
+  //   throw new Error('Invalid target URL');
+  // }
 
   // 验证过期时间格式
   if (expiry && isNaN(Date.parse(expiry))) {
@@ -98,12 +98,12 @@ async function updateMapping(originalPath, newPath, target, name, expiry) {
     throw new Error('Invalid input');
   }
 
-  // 验证 URL 格式
-  try {
-    new URL(target);
-  } catch (e) {
-    throw new Error('Invalid target URL');
-  }
+  // // 验证 URL 格式
+  // try {
+  //   new URL(target);
+  // } catch (e) {
+  //   throw new Error('Invalid target URL');
+  // }
 
   // 验证过期时间格式
   if (expiry && isNaN(Date.parse(expiry))) {
