@@ -16,8 +16,5 @@
       "sharp",
       "workerd"
     ]
-  },
-  "dependencies": {
-    "mimetext": "^3.0.27"
   }
 }

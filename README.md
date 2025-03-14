@@ -11,7 +11,32 @@
 - 😋 可当短链接生成器
 - ☁️ 无需服务器
 
-## TODO
+## 使用步骤
+
+1. Fork 本项目
+   ![fork](./images/fork.png)
+2. 创建 KV 命名空间
+   ![create kv](./images/create-kv.png)
+3. 创建 Worker
+   ![create worker](./images/create-worker.png)
+4. 选择你 Fork 的项目
+   ![select fork](./images/create-worker2.png)
+5. 修改构建配置
+   ![build config](./images/create-worker3.png)
+6. 绑定 KV 命名空间 KV_BINDING
+   ![bind kv](./images/bind-kv.png)
+7. 点击保存版本
+   ![save](./images/save.png)
+8. 创建环境变量 PASSWORD
+   ![create env](./images/create-env.png)
+9. 点击保存版本
+   ![save](./images/save.png)
+10. 最终效果
+    ![final](./images/final.png)
+11. 回到部署页，点击 `您的上一次构建失败。查看构建` 然后点击 `重试构建`
+    
+ 
+## 贡献指南
 
 - [ ] 实现定时检查过期短链功能
   - [x] 自动检查过期的短链接
@@ -22,54 +47,5 @@
 - [ ] 支持多租户
 - [ ] 支持多语言
 - [ ] 支持多 Serverless 平台
-
-## 使用步骤
-
-1. Fork 本项目
-   ![fork](./images/fork.png)
-2. 创建 KV 命名空间
-   ![create kv](./images/create-kv-space.png)
-3. 安装 [Node.js](https://nodejs.org/) (建议 v16 或更高版本)
-4. 安装 [pnpm](https://pnpm.io/) 包管理器
-
-## 部署步骤
-
-1. 克隆项目并安装依赖：
-
-   ```bash
-   git clone https://github.com/yourusername/serverless-qrcode-hub.git
-   cd serverless-qrcode-hub
-   pnpm install
-   ```
-
-2. 配置 wrangler.toml：
-
-   - 替换 `account_id` 为你的 Cloudflare 账号 ID
-   - 替换 `kv_namespaces` 中的 id 为你创建的 KV 空间 ID
-
-3. 设置环境变量：
-
-   ```bash
-   # 设置管理后台密码
-   wrangler secret put PASSWORD
-   # 设置管理员邮箱（用于接收过期通知）
-   wrangler secret put ADMIN_EMAIL
-   # 设置域名
-   wrangler secret put DOMAIN
-   ```
-
-4. 部署到 Cloudflare Workers：
-   ```bash
-   pnpm run deploy
-   ```
-
-## 使用说明
-
-1. 访问 `https://your-worker-domain/admin` 进入管理后台
-2. 使用设置的密码登录
-3. 创建新的短链接，上传群二维码
-4. 可选择设置过期时间和自定义二维码样式
-
-## 贡献指南
 
 欢迎提交 Issue 和 Pull Request！
