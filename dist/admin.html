@@ -164,14 +164,41 @@
     <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            // 绑定事件监听器
-            document.getElementById('logoutBtn').addEventListener('click', logout);
-            document.getElementById('addMappingBtn').addEventListener('click', addMapping);
-            setupQRUpload();
+            // 添加初始认证检查
+            checkAuth().then(isAuthenticated => {
+                if (!isAuthenticated) {
+                    window.location.href = '/login';
+                    return;
+                }
+                // 初始化页面
+                initializePage();
+            });
 
-            // 添加主题切换功能
-            const themeToggleBtn = document.getElementById('themeToggleBtn');
-            themeToggleBtn.addEventListener('click', toggleTheme);
+            // 认证检查函数
+            async function checkAuth() {
+                try {
+                    const response = await fetch('/admin/mappings');
+                    return response.status !== 401;
+                } catch (error) {
+                    console.error('认证检查失败:', error);
+                    return false;
+                }
+            }
+
+            // 页面初始化函数
+            function initializePage() {
+                // 将原有的初始化代码移到这里
+                document.getElementById('logoutBtn').addEventListener('click', logout);
+                document.getElementById('addMappingBtn').addEventListener('click', addMapping);
+                setupQRUpload();
+                
+                // 添加主题切换功能
+                const themeToggleBtn = document.getElementById('themeToggleBtn');
+                themeToggleBtn.addEventListener('click', toggleTheme);
+                
+                // 加载映射数据
+                loadMappings();
+            }
 
             // 二维码上传和识别相关
             function setupQRUpload() {
@@ -621,27 +648,28 @@
 
                 try {
                     const response = await fetch(`/admin/mappings?page=${currentPage}&pageSize=${pageSize}`);
-
                     if (response.status === 401) {
                         window.location.href = '/login';
                         return;
                     }
 
-                    if (response.ok) {
-                        const data = await response.json();
-                        allMappings = Object.entries(data.mappings);
-                        renderCurrentPage();
-
-                        // 更新分页信息
-                        currentPage = data.page;
-                        const totalPages = data.totalPages;
-                        document.getElementById('currentPage').textContent = currentPage;
-                        document.getElementById('prevPage').disabled = currentPage === 1;
-                        document.getElementById('nextPage').disabled = currentPage === totalPages;
+                    if (!response.ok) {
+                        throw new Error('加载数据失败');
                     }
+
+                    const data = await response.json();
+                    allMappings = Object.entries(data.mappings);
+                    renderCurrentPage();
+
+                    // 更新分页信息
+                    currentPage = data.page;
+                    const totalPages = data.totalPages;
+                    document.getElementById('currentPage').textContent = currentPage;
+                    document.getElementById('prevPage').disabled = currentPage === 1;
+                    document.getElementById('nextPage').disabled = currentPage === totalPages;
                 } catch (error) {
                     console.error('加载数据失败:', error);
-                    alert('加载数据失败，请刷新页面重试');
+                    showAlert('加载数据失败，请刷新页面重试');
                 } finally {
                     loading.classList.add('hidden');
                 }
@@ -668,9 +696,6 @@
                     window.location.href = '/login';
                 });
             }
-
-            // 初始加载
-            loadMappings();
         });
     </script>
 </body>

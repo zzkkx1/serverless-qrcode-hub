@@ -1,10 +1,14 @@
 name = "serverless-qrcode-hub"
-main = "src/gateway.js"
+main = "index.js"
 compatibility_date = "2023-01-01"
 
 kv_namespaces = [
     { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" },
 ]
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
 
 [vars]
 # 本地开发时的默认值，生产环境请使用 Cloudflare Dashboard 设置
