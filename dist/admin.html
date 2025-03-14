@@ -27,6 +27,14 @@
             margin: 20px auto;
             padding: 0 20px;
         }
+
+        #qr-container canvas {
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        #qr-container.switching canvas {
+            opacity: 0;
+        }
     </style>
 </head>
 
@@ -41,11 +49,25 @@
             <div id="qr-container" class="flex justify-center mb-4"></div>
             <div class="mb-4">
                 <label class="floating-label">
-                    <span class="label-text">链接地址</span>
+                    <span class="label-text text-primary">链接地址</span>
                 </label>
-                <input type="text" id="qr-url" class="input input-bordered w-full" readonly>
+                <input type="text" id="qr-url" class="input input-ghost w-full" readonly>
             </div>
             <div class="modal-action gap-4">
+                <label class="label cursor-pointer gap-2">
+                    <input type="checkbox" id="qr-show-logo" class="checkbox checkbox-primary" checked>
+                    <span class="label-text">显示微信图标</span>
+                </label>
+
+                <select id="qr-dots-style" class="select select-bordered">
+                    <option value="dots" selected>圆点</option>
+                    <option value="rounded">圆角</option>
+                    <option value="classy">优雅</option>
+                    <option value="classy-rounded">优雅圆角</option>
+                    <option value="square">方形</option>
+                    <option value="extra-rounded">超圆角</option>
+                </select>
+
                 <button id="qr-download" class="btn btn-primary">下载二维码</button>
                 <button class="btn" onclick="document.getElementById('qr-modal').close()">关闭</button>
             </div>
@@ -525,11 +547,13 @@
             }
 
             // 修改生成二维码的函数
-            function generateQRForMapping(url) {
+            function generateQRForMapping(url, newPath) {
                 const modal = document.getElementById('qr-modal');
                 const container = document.getElementById('qr-container');
                 const downloadBtn = document.getElementById('qr-download');
                 const urlInput = document.getElementById('qr-url');
+                const showLogoCheckbox = document.getElementById('qr-show-logo');
+                const dotsStyleSelect = document.getElementById('qr-dots-style');
 
                 // 清空之前的内容
                 container.innerHTML = '';
@@ -537,46 +561,68 @@
                 // 设置 URL 文本
                 urlInput.value = url;
 
-                // 创建新的二维码
-                const qrCode = new QRCodeStyling({
+                // 基础 QR 配置
+                const getQRConfig = (showLogo, dotsType) => ({
                     width: 300,
                     height: 300,
                     type: 'canvas',
                     data: url,
                     dotsOptions: {
                         color: "#000000",
-                        type: 'rounded'  // 使用圆角方块                        
+                        type: dotsType
                     },
                     cornersSquareOptions: {
-                        type: 'rounded'  // 角落也使用圆角方块
+                        type: 'rounded'
                     },
                     cornersDotOptions: {
-                        type: 'rounded'  // 角落的点也使用圆角
+                        type: 'rounded'
                     },
                     backgroundOptions: {
-                        color: "#FFFFFF"  // 白色背景
+                        color: "#FFFFFF"
                     },
-                    imageOptions: {
-                        hideBackgroundDots: true,
-                        imageSize: 0.23,  // 稍微调小 logo 尺寸
-                        margin: 5
-                    },
-                    image: "/wechat.svg",
                     qrOptions: {
-                        errorCorrectionLevel: 'H'  // 使用最高容错率
-                    }
+                        errorCorrectionLevel: 'H'
+                    },
+                    ...(showLogo ? {
+                        image: "/wechat.svg",
+                        imageOptions: {
+                            hideBackgroundDots: true,
+                            imageSize: 0.23,
+                            margin: 5
+                        }
+                    } : {})
                 });
 
-                // 将二维码添加到容器中
-                qrCode.append(container);
+                // 创建新的二维码
+                let currentQRCode = new QRCodeStyling(getQRConfig(showLogoCheckbox.checked, dotsStyleSelect.value));
+                currentQRCode.append(container);
+
+                // 监听复选框和选择器变化
+                const updateQRCode = () => {
+                    container.classList.add('switching');
+
+                    setTimeout(() => {
+                        container.innerHTML = '';
+                        currentQRCode = new QRCodeStyling(getQRConfig(showLogoCheckbox.checked, dotsStyleSelect.value));
+                        currentQRCode.append(container);
+
+                        requestAnimationFrame(() => {
+                            container.classList.remove('switching');
+                        });
+                    }, 200);
+                };
+
+                showLogoCheckbox.onchange = updateQRCode;
+                dotsStyleSelect.onchange = updateQRCode;
 
                 // 更新下载按钮点击事件
                 downloadBtn.onclick = () => {
-                    const fileName = 'qr-' + new Date().toISOString()
+                    const timestamp = new Date().toISOString()
                         .replace(/[:.]/g, '-')
                         .replace('T', '_')
                         .replace('Z', '');
-                    qrCode.download({
+                    const fileName = `qr-${newPath}-${timestamp}`;
+                    currentQRCode.download({
                         name: fileName,
                         extension: 'png'
                     });
@@ -609,7 +655,7 @@
                 const buttons = [
                     { text: '编辑', class: 'btn btn-warning btn-sm mr-2', handler: () => toggleEditMode(row) },
                     { text: '删除', class: 'btn btn-error btn-sm mr-2', handler: () => deleteMapping(path) },
-                    { text: '二维码', class: 'btn btn-info btn-sm', handler: () => generateQRForMapping(window.location.origin + '/' + path) }
+                    { text: '二维码', class: 'btn btn-info btn-sm', handler: () => generateQRForMapping(window.location.origin + '/' + path, path) }
                 ];
 
                 buttons.forEach(({ text, class: className, handler }) => {
