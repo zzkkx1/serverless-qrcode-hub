@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html data-theme="light">
+
+<head>
+    <script>
+        // 在页面渲染前就设置主题
+        (function () {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <title>管理面板</title>
+    <meta charset="UTF-8">
+    <meta name="darkreader-lock">
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="navbar bg-base-100 shadow-lg rounded-box mb-8">
+        <div class="flex-1">
+            <h1 class="text-2xl font-bold text-primary">管理面板</h1>
+        </div>
+        <div class="flex-none gap-2">
+            <button id="themeToggleBtn" class="btn btn-ghost">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
+            <button id="logoutBtn" class="btn btn-error">退出登录</button>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title text-xl mb-4">新二维码识别</h2>
+            <div id="qr-upload-area"
+                class="border-2 border-dashed border-primary p-8 text-center rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
+                <p class="text-lg">点击或拖拽二维码图片到此处</p>
+                <input type="file" id="qr-file" accept="image/*" class="hidden">
+            </div>
+            <div id="qr-result" class="card bg-base-200 hidden mt-4">
+                <div class="card-body">
+                    <h3 class="card-title text-lg">识别结果（已自动填充到下方的目标 URL处）</h3>
+                    <p id="decoded-text" class="text-primary font-mono break-all"></p>
+                    <div class="card-actions justify-end">
+                        <button id="copy-btn" class="btn btn-success">复制链接</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-xl mb-4">URL 映射管理</h2>
+            <div id="loading" class="text-center py-4 hidden">
+                <span class="loading loading-spinner loading-lg"></span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>名称</th>
+                            <th>短链接</th>
+                            <th>目标 URL</th>
+                            <th>失效日期</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappingsTableBody">
+                        <tr id="addNewRow">
+                            <td><input type="text" id="newName" placeholder="例如: 官网链接"
+                                    class="input input-bordered w-full"></td>
+                            <td><input type="text" id="newPath" placeholder="例如: url1"
+                                    class="input input-bordered w-full"></td>
+                            <td><input type="text" id="newTarget" placeholder="https://target.com/xxx"
+                                    class="input input-bordered w-full"></td>
+                            <td><input type="date" id="newExpiry" class="input input-bordered w-full"></td>
+                            <td><button id="addMappingBtn" class="btn btn-primary btn-sm">添加</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex justify-between items-center mt-4">
+                <div class="flex items-center gap-4 whitespace-nowrap">
+                    <span>每页显示:</span>
+                    <select id="pageSize" class="select select-bordered select-sm">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+                <div class="join">
+                    <button id="prevPage" class="join-item btn btn-sm">上一页</button>
+                    <button class="join-item btn btn-sm">第 <span id="currentPage">1</span> 页</button>
+                    <button id="nextPage" class="join-item btn btn-sm">下一页</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript" src="https://unpkg.com/qr-code-styling@1.9.1/lib/qr-code-styling.js"></script>
+    <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // 绑定事件监听器
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('addMappingBtn').addEventListener('click', addMapping);
+            setupQRUpload();
+
+            // 添加主题切换功能
+            const themeToggleBtn = document.getElementById('themeToggleBtn');
+            themeToggleBtn.addEventListener('click', toggleTheme);
+
+            // 二维码上传和识别相关
+            function setupQRUpload() {
+                const uploadArea = document.getElementById('qr-upload-area');
+                const fileInput = document.getElementById('qr-file');
+                const copyBtn = document.getElementById('copy-btn');
+                const qrResult = document.getElementById('qr-result');
+
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    uploadArea.classList.add('bg-base-200');
+                });
+                uploadArea.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    uploadArea.classList.remove('bg-base-200');
+                });
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    uploadArea.classList.remove('bg-base-200');
+                    handleFiles(e.dataTransfer.files);
+                });
+
+                fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+                copyBtn.addEventListener('click', copyDecodedText);
+            }
+
+            function handleFiles(files) {
+                if (files.length === 0) return;
+
+                const file = files[0];
+                if (!file.type.startsWith('image/')) {
+                    alert('请上传图片文件');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => decodeQR(img);
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+
+            async function decodeQR(img) {
+                try {
+                    const codeReader = new ZXing.BrowserMultiFormatReader();
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    ctx.drawImage(img, 0, 0);
+
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve));
+                    const imageUrl = URL.createObjectURL(blob);
+                    const result = await codeReader.decodeFromImageUrl(imageUrl);
+                    URL.revokeObjectURL(imageUrl);
+
+                    const qrResult = document.getElementById('qr-result');
+                    if (result) {
+                        const decodedText = result.text;
+                        document.getElementById('decoded-text').textContent = decodedText;
+                        qrResult.classList.remove('hidden');
+                        
+                        // 自动填充到目标 URL 输入框
+                        document.getElementById('newTarget').value = decodedText;
+                        // 滚动到添加映射区域
+                        document.getElementById('addNewRow').scrollIntoView({ behavior: 'smooth' });
+                    } else {
+                        alert('未能识别二维码，请确保图片清晰且包含有效的二维码');
+                        qrResult.classList.add('hidden');
+                    }
+                } catch (error) {
+                    console.error('二维码识别错误:', error);
+                    alert('二维码识别失败，请确保图片清晰且包含有效的二维码');
+                    document.getElementById('qr-result').classList.add('hidden');
+                }
+            }
+
+            function copyDecodedText() {
+                const text = document.getElementById('decoded-text').textContent;
+                navigator.clipboard.writeText(text)
+                    .then(() => {
+                        // 复制成功后自动填充到目标 URL 输入框
+                        document.getElementById('newTarget').value = text;
+                        // 滚动到添加映射区域
+                        document.getElementById('addNewRow').scrollIntoView({ behavior: 'smooth' });
+                    })
+                    .catch(err => {
+                        console.error('复制失败:', err);
+                        alert('复制失败，请手动复制');
+                    });
+            }
+
+            async function addMapping() {
+                const name = document.getElementById('newName').value;
+                const path = document.getElementById('newPath').value;
+                const target = document.getElementById('newTarget').value;
+                const expiry = document.getElementById('newExpiry').value;
+
+                const response = await fetch('/admin/mapping', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, path, target, expiry })
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                if (response.ok) {
+                    location.reload();
+                }
+            }
+
+            async function deleteMapping(path) {
+                const response = await fetch('/admin/mapping', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path })
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                if (response.ok) {
+                    location.reload();
+                }
+            }
+
+            function generateQRForMapping(url) {
+                const qrCode = new QRCodeStyling({
+                    width: 400,
+                    height: 400,
+                    type: 'canvas',
+                    data: url,
+                    dotsOptions: { color: '#000000' },
+                    backgroundOptions: { color: '#ffffff' },
+                    imageOptions: {
+                        hideBackgroundDots: true,
+                        imageSize: 0.3,
+                        margin: 5
+                    },
+                    image: "/wechat.svg"  // 这里使用您稍后提供的 SVG 图标路径
+                });
+
+                const canvas = document.createElement('canvas');
+                qrCode.append(canvas);
+
+                const fileName = new Date().toISOString()
+                    .replace(/[:.]/g, '-')
+                    .replace('T', '_')
+                    .replace('Z', '');
+
+                qrCode.download({
+                    name: 'qr-' + fileName,
+                    extension: 'png'
+                });
+            }
+
+            function logout() {
+                fetch('/admin/logout', { method: 'POST' }).then(() => {
+                    window.location.href = '/login';
+                });
+            }
+
+            let allMappings = [];
+            let currentPage = 1;
+            let pageSize = 10;
+
+            async function loadMappings() {
+                const loading = document.getElementById('loading');
+                loading.classList.remove('hidden');
+                
+                try {
+                    const response = await fetch(`/admin/mappings?page=${currentPage}&pageSize=${pageSize}`);
+                    
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        allMappings = Object.entries(data.mappings);
+                        renderCurrentPage();
+                        
+                        // 更新分页信息
+                        currentPage = data.page;
+                        const totalPages = data.totalPages;
+                        document.getElementById('currentPage').textContent = currentPage;
+                        document.getElementById('prevPage').disabled = currentPage === 1;
+                        document.getElementById('nextPage').disabled = currentPage === totalPages;
+                    }
+                } catch (error) {
+                    console.error('加载数据失败:', error);
+                    alert('加载数据失败，请刷新页面重试');
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            }
+
+            function renderCurrentPage() {
+                const table = document.getElementById('mappingsTableBody');
+                const addNewRow = document.getElementById('addNewRow');
+                const fragment = document.createDocumentFragment();
+                
+                // 清除现有行，保留添加新映射的行
+                while (table.firstChild) {
+                    table.removeChild(table.firstChild);
+                }
+                
+                const start = (currentPage - 1) * pageSize;
+                const end = Math.min(start + pageSize, allMappings.length);
+                
+                for (let i = start; i < end; i++) {
+                    const [path, mapping] = allMappings[i];
+                    const row = createMappingRow(path, mapping);
+                    fragment.appendChild(row);
+                }
+                
+                // 添加新映射的行
+                fragment.appendChild(addNewRow);
+                table.appendChild(fragment);
+            }
+
+            function createMappingRow(path, mapping) {
+                const row = document.createElement('tr');
+                
+                // 使用数组和 map 来优化单元格创建
+                const cellsData = [
+                    { text: mapping.name || '-', data: mapping.name || '-' },
+                    { text: path, data: path },
+                    { text: mapping.target, data: mapping.target },
+                    { text: mapping.expiry || '永久有效', data: mapping.expiry || '' }
+                ];
+                
+                cellsData.forEach(({ text, data }) => {
+                    const cell = document.createElement('td');
+                    cell.textContent = text;
+                    cell.dataset.original = data;
+                    row.appendChild(cell);
+                });
+                
+                const actionsCell = document.createElement('td');
+                const buttons = [
+                    { text: '编辑', class: 'btn btn-warning btn-sm mr-2', handler: () => toggleEditMode(row) },
+                    { text: '删除', class: 'btn btn-error btn-sm mr-2', handler: () => deleteMapping(path) },
+                    { text: '生成二维码', class: 'btn btn-info btn-sm', handler: () => generateQRForMapping(window.location.origin + '/' + path) }
+                ];
+                
+                buttons.forEach(({ text, class: className, handler }) => {
+                    const button = document.createElement('button');
+                    button.textContent = text;
+                    button.className = className;
+                    button.onclick = handler;
+                    actionsCell.appendChild(button);
+                });
+                
+                row.appendChild(actionsCell);
+                return row;
+            }
+
+            // 添加切换编辑模式的函数
+            function toggleEditMode(row) {
+                const isEditing = row.classList.toggle('editing');
+                const cells = row.cells;
+                const originalPath = cells[1].dataset.original;
+
+                if (isEditing) {
+                    // 切换到编辑模式
+                    cells[0].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[0].dataset.original}">`;
+                    cells[1].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[1].dataset.original}">`;
+                    cells[2].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[2].dataset.original}">`;
+                    cells[3].innerHTML = `<input type="date" class="input input-bordered input-sm w-full" value="${cells[3].dataset.original}">`;
+                    
+                    const editButton = cells[4].children[0];
+                    editButton.textContent = '保存';
+                    editButton.className = 'btn btn-success btn-sm mr-2';
+                } else {
+                    // 获取新值
+                    const newName = cells[0].querySelector('input').value;
+                    const newPath = cells[1].querySelector('input').value;
+                    const newTarget = cells[2].querySelector('input').value;
+                    const newExpiry = cells[3].querySelector('input').value;
+
+                    // 检查是否有任何修改
+                    const hasChanges = 
+                        newName !== cells[0].dataset.original ||
+                        newPath !== cells[1].dataset.original ||
+                        newTarget !== cells[2].dataset.original ||
+                        newExpiry !== cells[3].dataset.original;
+
+                    if (!hasChanges) {
+                        // 如果没有修改，直接恢复显示
+                        restoreRow(row);
+                        return;
+                    }
+
+                    // 保存更改
+                    const newMapping = {
+                        name: newName,
+                        path: newPath,
+                        target: newTarget,
+                        expiry: newExpiry,
+                        originalPath: originalPath
+                    };
+                    updateMapping(newMapping);
+                }
+            }
+
+            // 添加恢复行显示的辅助函数
+            function restoreRow(row) {
+                const cells = row.cells;
+                cells[0].textContent = cells[0].dataset.original;
+                cells[1].textContent = cells[1].dataset.original;
+                cells[2].textContent = cells[2].dataset.original;
+                cells[3].textContent = cells[3].dataset.original || '永久有效';
+                
+                const editButton = cells[4].children[0];
+                editButton.textContent = '编辑';
+                editButton.className = 'btn btn-warning btn-sm mr-2';
+                
+                row.classList.remove('editing');
+            }
+
+            // 添加更新映射的函数
+            async function updateMapping(mapping) {
+                const response = await fetch('/admin/mapping', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(mapping)
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('更新失败，请重试');
+                    location.reload();
+                }
+            }
+
+            // 修改 toggleTheme 函数
+            function toggleTheme() {
+                const html = document.documentElement;
+                const currentTheme = html.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                html.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+                updateThemeIcon(newTheme);
+            }
+
+            function updateThemeIcon(theme) {
+                const iconPath = themeToggleBtn.querySelector('path');
+                if (theme === 'dark') {
+                    iconPath.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z');
+                } else {
+                    iconPath.setAttribute('d', 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z');
+                }
+            }
+
+            // 初始加载
+            loadMappings();
+        });
+    </script>
+</body>
+
+</html>
