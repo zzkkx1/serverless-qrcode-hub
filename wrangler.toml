@@ -6,9 +6,19 @@ kv_namespaces = [
     { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" },
 ]
 
+send_email = [{ name = "EMAIL_BINDING", destination_address = "test@test.com" }]
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
+
+
+# 每天 UTC+8 的 10 点执行
+[triggers]
+crons = ["0 2 * * *"]
+
+[env.dev.triggers]
+crons = ["* * * * *"]
 
 [vars]
 # 本地开发时的默认值，生产环境请使用 Cloudflare Dashboard 设置

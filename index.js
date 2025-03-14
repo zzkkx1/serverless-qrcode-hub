@@ -233,5 +233,9 @@ export default {
       console.error('Redirect error:', error);
       return new Response('Internal Server Error', { status: 500 });
     }
-  }
+  },
+
+  async scheduled(controller, env, ctx) {
+    console.log("cron processed");
+  },
 };
