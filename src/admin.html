@@ -50,7 +50,7 @@
 
     <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
-            <h2 class="card-title text-xl mb-4">新二维码识别</h2>
+            <h2 class="card-title text-xl mb-4">二维码识别</h2>
             <div id="qr-upload-area"
                 class="border-2 border-dashed border-primary p-8 text-center rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
                 <p class="text-lg">点击或拖拽二维码图片到此处</p>
@@ -70,42 +70,42 @@
 
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title text-xl mb-4">URL 映射管理</h2>
+            <h2 class="card-title text-xl mb-4">映射管理</h2>
             <div id="loading" class="text-center py-4 hidden">
                 <span class="loading loading-spinner loading-lg"></span>
             </div>
 
             <!-- 新的添加表单区域 -->
             <div class="card bg-base-200 p-4 mb-4">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div>
                         <label for="newName" class="floating-label">
-                            <span class="label-text">名称，例:音乐群1</span>
-                            <input type="text" id="newName" placeholder="名称，例:音乐群1" class="input input-md">
+                            <span class="label-text">条目名称</span>
+                            <input type="text" id="newName" placeholder="条目名称，例:音乐群1" class="input input-md w-full">
                         </label>
                     </div>
                     <div>
                         <label for="newPath" class="floating-label">
-                            <span class="label-text">短链接，例:music1</span>
-                            <input type="text" id="newPath" placeholder="短链接，例:music1" class="input input-md">
+                            <span class="label-text">短链名</span>
+                            <input type="text" id="newPath" placeholder="短链名，例:music1" class="input input-md w-full">
                         </label>
                     </div>
                     <div>
                         <label for="newTarget" class="floating-label">
-                            <span class="label-text">目标URL，例:https://x.com/xxx</span>
+                            <span class="label-text">目标URL</span>
                             <input type="text" id="newTarget" placeholder="目标URL，例:https://x.com/xxx"
-                                class="input input-md">
+                                class="input input-md w-full">
                         </label>
                     </div>
                     <div>
                         <label for="newExpiry" class="floating-label">
                             <span class="label-text">失效日期</span>
-                            <input type="date" id="newExpiry" class="input input-md">
+                            <input type="date" id="newExpiry" class="input input-md w-full mb-2">
                         </label>
-                        <div class="flex gap-2">
-                            <button id="addMappingBtn" class="btn btn-primary">添加</button>
-                        </div>
                     </div>
+
+                    <button id="addMappingBtn" class="btn btn-primary btn-wide">添加映射</button>
+
                 </div>
             </div>
 
@@ -113,8 +113,8 @@
                 <table class="table table-zebra w-full">
                     <thead>
                         <tr>
-                            <th>名称</th>
-                            <th>短链接</th>
+                            <th>条目名称</th>
+                            <th>短链名</th>
                             <th>目标 URL</th>
                             <th>失效日期</th>
                             <th>操作</th>
@@ -300,15 +300,15 @@
 
                 // 输入验证
                 if (!name) {
-                    showAlert('请输入名称');
+                    showAlert('请输入条目名称');
                     return;
                 }
                 if (!path) {
-                    showAlert('请输入短链接');
+                    showAlert('请输入短链名');
                     return;
                 }
                 if (!/^[a-zA-Z0-9-_]+$/.test(path)) {
-                    showAlert('短链接只能包含字母、数字、下划线和横线');
+                    showAlert('短链名只能包含字母、数字、下划线和横线');
                     return;
                 }
                 if (!target) {
@@ -555,15 +555,15 @@
             async function updateMapping(mapping) {
                 // 输入验证
                 if (!mapping.name) {
-                    showAlert('请输入名称');
+                    showAlert('请输入条目名称');
                     return;
                 }
                 if (!mapping.path) {
-                    showAlert('请输入短链接');
+                    showAlert('请输入短链名');
                     return;
                 }
                 if (!/^[a-zA-Z0-9-_]+$/.test(mapping.path)) {
-                    showAlert('短链接只能包含字母、数字、下划线和横线');
+                    showAlert('短链名只能包含字母、数字、下划线和横线');
                     return;
                 }
                 if (!mapping.target) {
