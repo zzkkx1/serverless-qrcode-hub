@@ -39,6 +39,12 @@
             </form>
             <h3 class="font-bold text-lg mb-4">二维码</h3>
             <div id="qr-container" class="flex justify-center mb-4"></div>
+            <div class="mb-4">
+                <label class="floating-label">
+                    <span class="label-text">链接地址</span>
+                </label>
+                <input type="text" id="qr-url" class="input input-bordered w-full" readonly>
+            </div>
             <div class="modal-action gap-4">
                 <button id="qr-download" class="btn btn-primary">下载二维码</button>
                 <button class="btn" onclick="document.getElementById('qr-modal').close()">关闭</button>
@@ -68,6 +74,40 @@
 
     <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
+            <h2 class="card-title text-xl mb-4">使用说明</h2>
+            <div class="join join-vertical w-full">
+                <div class="collapse collapse-arrow join-item border border-base-300">
+                    <input type="radio" name="my-accordion-4" checked="checked" />
+                    <div class="collapse-title text-lg font-bold">
+                        使用步骤
+                    </div>
+                    <div class="collapse-content">
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>1.将群聊二维码拖动或点击上传到二维码识别区域，即可自动识别二维码，并自动填充到目标URL输入框</li>
+                            <li>2.在目标URL输入框中输入群聊的名称、短链的名称，选择过期时间或者不设置过期时间，点击添加短链二维码</li>
+                            <li>3.在下方管理面板中可以看到已经添加的短链二维码，可以编辑、删除已创建的短链，并可查看或下载对应二维码</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="collapse collapse-arrow join-item border border-base-300">
+                    <input type="radio" name="my-accordion-4" />
+                    <div class="collapse-title text-lg font-bold">
+                        注意事项
+                    </div>
+                    <div class="collapse-content">
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>1.短链名只能包含字母、数字、下划线和横线</li>
+                            <li>2.可以设置短链的过期时间，不设置则永久有效</li>
+                            <li>3.如果过期会自动通过邮件通知</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
             <h2 class="card-title text-xl mb-4">二维码识别</h2>
             <div id="qr-upload-area"
                 class="border-2 border-dashed border-primary p-8 text-center rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
@@ -88,7 +128,7 @@
 
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title text-xl mb-4">映射管理</h2>
+            <h2 class="card-title text-xl mb-4">短链二维码管理</h2>
             <div id="loading" class="text-center py-4 hidden">
                 <span class="loading loading-spinner loading-lg"></span>
             </div>
@@ -122,7 +162,7 @@
                         </label>
                     </div>
 
-                    <button id="addMappingBtn" class="btn btn-primary btn-wide">添加映射</button>
+                    <button id="addMappingBtn" class="btn btn-primary btn-wide">添加短链二维码</button>
 
                 </div>
             </div>
@@ -177,8 +217,11 @@
             // 认证检查函数
             async function checkAuth() {
                 try {
-                    const response = await fetch('/admin/mappings');
-                    return response.status !== 401;
+                    const response = await fetch('/api/mappings');
+                    if (response.status === 401) {
+                        return false;
+                    }
+                    return true;
                 } catch (error) {
                     console.error('认证检查失败:', error);
                     return false;
@@ -191,13 +234,25 @@
                 document.getElementById('logoutBtn').addEventListener('click', logout);
                 document.getElementById('addMappingBtn').addEventListener('click', addMapping);
                 setupQRUpload();
-                
+
                 // 添加主题切换功能
                 const themeToggleBtn = document.getElementById('themeToggleBtn');
                 themeToggleBtn.addEventListener('click', toggleTheme);
-                
-                // 加载映射数据
+
+                // 加载短链二维码数据
                 loadMappings();
+
+                // 添加全局错误处理
+                setupErrorHandling();
+            }
+
+            // 添加全局错误处理
+            function setupErrorHandling() {
+                window.addEventListener('unhandledrejection', function (event) {
+                    if (event.reason.status === 401) {
+                        window.location.href = '/login';
+                    }
+                });
             }
 
             // 二维码上传和识别相关
@@ -287,7 +342,7 @@
                     .then(() => {
                         // 复制成功后自动填充到目标 URL 输入框
                         document.getElementById('newTarget').value = text;
-                        // 滚动到添加映射区域
+                        // 滚动到添加短链二维码区域
                         document.getElementById('addNewRow').scrollIntoView({ behavior: 'smooth' });
                         showAlert('复制成功', 'success');
                     })
@@ -297,16 +352,14 @@
                     });
             }
 
-            // 添加显示警告的函数
+            // 修改 showAlert 函数，支持更多类型
             function showAlert(message, type = 'error') {
                 const alertContainer = document.getElementById('alertContainer');
                 const alert = document.createElement('div');
 
-                // 设置警告类型样式
                 const alertClass = type === 'error' ? 'alert alert-error' : 'alert alert-success';
                 alert.className = `${alertClass} mb-4 shadow-lg min-w-[300px]`;
 
-                // 创建警告内容
                 alert.innerHTML = `
                     <div class="flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
@@ -319,24 +372,70 @@
                     </div>
                 `;
 
-                // 添加到容器，并设置初始透明度
                 alert.style.opacity = '0';
                 alertContainer.appendChild(alert);
 
-                // 淡入效果
                 setTimeout(() => {
                     alert.style.transition = 'opacity 0.3s ease-in-out';
                     alert.style.opacity = '1';
                 }, 10);
 
-                // 3秒后淡出并移除
                 setTimeout(() => {
                     alert.style.opacity = '0';
                     setTimeout(() => alert.remove(), 300);
                 }, 3000);
             }
 
-            // 修改 addMapping 函数中的错误提示
+            async function loadMappings() {
+                const loading = document.getElementById('loading');
+                loading.classList.remove('hidden');
+
+                try {
+                    const response = await fetch(`/api/mappings?page=${currentPage}&pageSize=${pageSize}`);
+
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error('加载数据失败');
+                    }
+
+                    const data = await response.json();
+                    allMappings = Object.entries(data.mappings);
+                    renderCurrentPage();
+
+                    // 更新分页信息
+                    currentPage = data.page;
+                    const totalPages = data.totalPages;
+                    document.getElementById('currentPage').textContent = currentPage;
+                    document.getElementById('prevPage').disabled = currentPage === 1;
+                    document.getElementById('nextPage').disabled = currentPage === totalPages;
+                } catch (error) {
+                    console.error('加载数据失败:', error);
+                    showAlert('加载数据失败，请刷新页面重试');
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            }
+
+            function renderCurrentPage() {
+                const table = document.getElementById('mappingsTableBody');
+                const fragment = document.createDocumentFragment();
+
+                const start = (currentPage - 1) * pageSize;
+                const end = Math.min(start + pageSize, allMappings.length);
+
+                for (let i = start; i < end; i++) {
+                    const [path, mapping] = allMappings[i];
+                    const row = createMappingRow(path, mapping);
+                    fragment.appendChild(row);
+                }
+
+                table.appendChild(fragment);
+            }
+
             async function addMapping() {
                 const name = document.getElementById('newName').value.trim();
                 const path = document.getElementById('newPath').value.trim();
@@ -360,13 +459,9 @@
                     showAlert('请输入目标 URL');
                     return;
                 }
-                // if (!target.startsWith('http://') && !target.startsWith('https://')) {
-                //     showAlert('目标 URL 必须以 http:// 或 https:// 开头');
-                //     return;
-                // }
 
                 try {
-                    const response = await fetch('/admin/mapping', {
+                    const response = await fetch('/api/mapping', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, path, target, expiry })
@@ -378,33 +473,43 @@
                     }
 
                     if (!response.ok) {
-                        const error = await response.json();
-                        showAlert(error.message || '添加失败，请重试');
+                        const data = await response.json();
+                        showAlert(data.error || '添加失败，请重试');
                         return;
                     }
 
                     showAlert('添加成功', 'success');
                     location.reload();
                 } catch (error) {
-                    console.error('添加映射失败:', error);
+                    console.error('添加短链二维码失败:', error);
                     showAlert('添加失败，请检查网络连接后重试');
                 }
             }
 
             async function deleteMapping(path) {
-                const response = await fetch('/admin/mapping', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path })
-                });
+                try {
+                    const response = await fetch('/api/mapping', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path })
+                    });
 
-                if (response.status === 401) {
-                    window.location.href = '/login';
-                    return;
-                }
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
 
-                if (response.ok) {
+                    if (!response.ok) {
+                        const data = await response.json();
+                        showAlert(data.error || '删除失败，请重试');
+                        return;
+                    }
+
+                    showAlert('删除成功', 'success');
                     location.reload();
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    showAlert('删除失败，请检查网络连接后重试');
                 }
             }
 
@@ -413,9 +518,13 @@
                 const modal = document.getElementById('qr-modal');
                 const container = document.getElementById('qr-container');
                 const downloadBtn = document.getElementById('qr-download');
+                const urlInput = document.getElementById('qr-url');
 
                 // 清空之前的内容
                 container.innerHTML = '';
+
+                // 设置 URL 文本
+                urlInput.value = url;
 
                 // 创建新的二维码
                 const qrCode = new QRCodeStyling({
@@ -468,7 +577,7 @@
                 modal.showModal();
             }
 
-            // 修改创建映射行的函数中的二维码按钮部分
+            // 修改创建短链二维码行的函数中的二维码按钮部分
             function createMappingRow(path, mapping) {
                 const row = document.createElement('tr');
 
@@ -569,32 +678,9 @@
                 row.classList.remove('editing');
             }
 
-            // 修改 updateMapping 函数中的错误提示
             async function updateMapping(mapping) {
-                // 输入验证
-                if (!mapping.name) {
-                    showAlert('请输入条目名称');
-                    return;
-                }
-                if (!mapping.path) {
-                    showAlert('请输入短链名');
-                    return;
-                }
-                if (!/^[a-zA-Z0-9-_]+$/.test(mapping.path)) {
-                    showAlert('短链名只能包含字母、数字、下划线和横线');
-                    return;
-                }
-                if (!mapping.target) {
-                    showAlert('请输入目标 URL');
-                    return;
-                }
-                // if (!mapping.target.startsWith('http://') && !mapping.target.startsWith('https://')) {
-                //     showAlert('目标 URL 必须以 http:// 或 https:// 开头');
-                //     return;
-                // }
-
                 try {
-                    const response = await fetch('/admin/mapping', {
+                    const response = await fetch('/api/mapping', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(mapping)
@@ -606,15 +692,15 @@
                     }
 
                     if (!response.ok) {
-                        const error = await response.json();
-                        showAlert(error.message || '更新失败，请重试');
+                        const data = await response.json();
+                        showAlert(data.error || '更新失败，请重试');
                         return;
                     }
 
                     showAlert('更新成功', 'success');
                     location.reload();
                 } catch (error) {
-                    console.error('更新映射失败:', error);
+                    console.error('更新短链二维码失败:', error);
                     showAlert('更新失败，请检查网络连接后重试');
                 }
             }
@@ -642,59 +728,23 @@
             let currentPage = 1;
             let pageSize = 10;
 
-            async function loadMappings() {
-                const loading = document.getElementById('loading');
-                loading.classList.remove('hidden');
-
+            async function logout() {
                 try {
-                    const response = await fetch(`/admin/mappings?page=${currentPage}&pageSize=${pageSize}`);
-                    if (response.status === 401) {
-                        window.location.href = '/login';
+                    const response = await fetch('/api/logout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+
+                    if (!response.ok) {
+                        showAlert('登出失败，请重试');
                         return;
                     }
 
-                    if (!response.ok) {
-                        throw new Error('加载数据失败');
-                    }
-
-                    const data = await response.json();
-                    allMappings = Object.entries(data.mappings);
-                    renderCurrentPage();
-
-                    // 更新分页信息
-                    currentPage = data.page;
-                    const totalPages = data.totalPages;
-                    document.getElementById('currentPage').textContent = currentPage;
-                    document.getElementById('prevPage').disabled = currentPage === 1;
-                    document.getElementById('nextPage').disabled = currentPage === totalPages;
-                } catch (error) {
-                    console.error('加载数据失败:', error);
-                    showAlert('加载数据失败，请刷新页面重试');
-                } finally {
-                    loading.classList.add('hidden');
-                }
-            }
-
-            function renderCurrentPage() {
-                const table = document.getElementById('mappingsTableBody');
-                const fragment = document.createDocumentFragment();
-
-                const start = (currentPage - 1) * pageSize;
-                const end = Math.min(start + pageSize, allMappings.length);
-
-                for (let i = start; i < end; i++) {
-                    const [path, mapping] = allMappings[i];
-                    const row = createMappingRow(path, mapping);
-                    fragment.appendChild(row);
-                }
-
-                table.appendChild(fragment);
-            }
-
-            function logout() {
-                fetch('/admin/logout', { method: 'POST' }).then(() => {
                     window.location.href = '/login';
-                });
+                } catch (error) {
+                    console.error('登出失败:', error);
+                    showAlert('登出失败，请检查网络连接后重试');
+                }
             }
         });
     </script>

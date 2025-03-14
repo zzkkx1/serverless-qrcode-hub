@@ -28,14 +28,11 @@ async function listMappings(page = 1, pageSize = 10) {
   let cursor = null;
   let count = 0;
 
-  // 计算需要跳过的记录数
   const skip = (page - 1) * pageSize;
 
   do {
-    // 使用 cursor 进行分页查询
     const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
 
-    // 处理当前批次的键
     for (const key of listResult.keys) {
       if (count >= skip && Object.keys(mappings).length < pageSize) {
         const value = await KV_BINDING.get(key.name, { type: "json" });
@@ -61,14 +58,6 @@ async function createMapping(path, target, name, expiry) {
     throw new Error('Invalid input');
   }
 
-  // // 验证 URL 格式
-  // try {
-  //   new URL(target);
-  // } catch (e) {
-  //   throw new Error('Invalid target URL');
-  // }
-
-  // 验证过期时间格式
   if (expiry && isNaN(Date.parse(expiry))) {
     throw new Error('Invalid expiry date');
   }
@@ -89,25 +78,15 @@ async function deleteMapping(path) {
   await KV_BINDING.delete(path);
 }
 
-// 添加更新映射的函数
 async function updateMapping(originalPath, newPath, target, name, expiry) {
   if (!originalPath || !newPath || !target) {
     throw new Error('Invalid input');
   }
 
-  // // 验证 URL 格式
-  // try {
-  //   new URL(target);
-  // } catch (e) {
-  //   throw new Error('Invalid target URL');
-  // }
-
-  // 验证过期时间格式
   if (expiry && isNaN(Date.parse(expiry))) {
     throw new Error('Invalid expiry date');
   }
 
-  // 如果路径发生变化，需要删除旧的映射
   if (originalPath !== newPath) {
     await KV_BINDING.delete(originalPath);
   }
@@ -127,16 +106,10 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.slice(1);
 
-    // 基础路由处理
-    if (!path) {
-      return Response.redirect(`${url.origin}/login`, 302);
-    }
-
-    // 管理后台路由处理
-    if (path.startsWith('admin')) {
-
-      // 无需认证的 API
-      if (path === 'admin/login' && request.method === 'POST') {
+    // API 路由处理
+    if (path.startsWith('api/')) {
+      // 登录 API
+      if (path === 'api/login' && request.method === 'POST') {
         const { password } = await request.json();
         if (password === env.PASSWORD) {
           return new Response(JSON.stringify({ success: true }), {
@@ -146,98 +119,76 @@ export default {
         return new Response('Unauthorized', { status: 401 });
       }
 
-      if (path === 'admin/logout' && request.method === 'POST') {
+      // 登出 API
+      if (path === 'api/logout' && request.method === 'POST') {
         return new Response(JSON.stringify({ success: true }), {
           headers: clearAuthCookie()
         });
       }
 
-      // 需要认证的路由
+      // 需要认证的 API
       if (!verifyAuthCookie(request, env)) {
-        return Response.redirect(`${url.origin}/login`, 302);
+        return new Response('Unauthorized', { status: 401 });
       }
 
       try {
-        // 映射列表
-        if (path === 'admin/mappings') {
+        // 获取映射列表
+        if (path === 'api/mappings') {
           const params = new URLSearchParams(url.search);
           const page = parseInt(params.get('page')) || 1;
           const pageSize = parseInt(params.get('pageSize')) || 10;
 
-          try {
-            const result = await listMappings(page, pageSize);
-            return new Response(JSON.stringify(result), {
-              headers: { 'Content-Type': 'application/json' }
-            });
-          } catch (error) {
-            console.error('List mappings error:', error);
-            return new Response(JSON.stringify({
-              error: 'Failed to fetch mappings'
-            }), {
-              status: 500,
-              headers: { 'Content-Type': 'application/json' }
-            });
-          }
+          const result = await listMappings(page, pageSize);
+          return new Response(JSON.stringify(result), {
+            headers: { 'Content-Type': 'application/json' }
+          });
         }
 
-        // 映射管理
-        if (path === 'admin/mapping') {
+        // 映射管理 API
+        if (path === 'api/mapping') {
+          // 创建映射
           if (request.method === 'POST') {
-            try {
-              const data = await request.json();
-              await createMapping(data.path, data.target, data.name, data.expiry);
-              return new Response(JSON.stringify({ success: true }), {
-                headers: { 'Content-Type': 'application/json' }
-              });
-            } catch (error) {
-              console.error('Create mapping error:', error);
-              return new Response(JSON.stringify({
-                error: error.message || 'Invalid input'
-              }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-              });
-            }
+            const data = await request.json();
+            await createMapping(data.path, data.target, data.name, data.expiry);
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
           }
 
+          // 更新映射
           if (request.method === 'PUT') {
-            try {
-              const data = await request.json();
-              await updateMapping(
-                data.originalPath,
-                data.path,
-                data.target,
-                data.name,
-                data.expiry
-              );
-              return new Response(JSON.stringify({ success: true }), {
-                headers: { 'Content-Type': 'application/json' }
-              });
-            } catch (error) {
-              console.error('Update mapping error:', error);
-              return new Response(JSON.stringify({
-                error: error.message || 'Invalid input'
-              }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-              });
-            }
+            const data = await request.json();
+            await updateMapping(
+              data.originalPath,
+              data.path,
+              data.target,
+              data.name,
+              data.expiry
+            );
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
           }
 
+          // 删除映射
           if (request.method === 'DELETE') {
             const { path } = await request.json();
             await deleteMapping(path);
-            return new Response('OK');
+            return new Response(JSON.stringify({ success: true }), {
+              headers: { 'Content-Type': 'application/json' }
+            });
           }
         }
 
         return new Response('Not Found', { status: 404 });
       } catch (error) {
-        console.error('Admin operation error:', error);
-        if (error.message === 'Invalid input') {
-          return new Response(error.message, { status: 400 });
-        }
-        return new Response('Internal Server Error', { status: 500 });
+        console.error('API operation error:', error);
+        return new Response(JSON.stringify({ 
+          error: error.message || 'Internal Server Error' 
+        }), { 
+          status: error.message === 'Invalid input' ? 400 : 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
     }
 
