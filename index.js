@@ -1,4 +1,13 @@
 let KV_BINDING;
+const banPath = [
+  'login', 'admin',
+  // static files
+  'admin.html', 'login.html',
+  'daisyui@5.css', 'tailwindcss@4.js',
+  'qr-code-styling.js', 'zxing.js',
+  'robots.txt', 'wechat.svg',
+  'favicon.svg',
+];
 
 // Cookie 相关函数
 function verifyAuthCookie(request, env) {
@@ -58,6 +67,11 @@ async function createMapping(path, target, name, expiry) {
     throw new Error('Invalid input');
   }
 
+  // 检查短链名是否在禁用列表中
+  if (banPath.includes(path)) {
+    throw new Error('该短链名已被系统保留，请使用其他名称');
+  }
+
   if (expiry && isNaN(Date.parse(expiry))) {
     throw new Error('Invalid expiry date');
   }
@@ -75,12 +89,23 @@ async function deleteMapping(path) {
   if (!path || typeof path !== 'string') {
     throw new Error('Invalid input');
   }
+
+  // 检查是否在禁用列表中
+  if (banPath.includes(path)) {
+    throw new Error('系统保留的短链名无法删除');
+  }
+
   await KV_BINDING.delete(path);
 }
 
 async function updateMapping(originalPath, newPath, target, name, expiry) {
   if (!originalPath || !newPath || !target) {
     throw new Error('Invalid input');
+  }
+
+  // 检查新短链名是否在禁用列表中
+  if (banPath.includes(newPath)) {
+    throw new Error('该短链名已被系统保留，请使用其他名称');
   }
 
   if (expiry && isNaN(Date.parse(expiry))) {
@@ -183,9 +208,9 @@ export default {
         return new Response('Not Found', { status: 404 });
       } catch (error) {
         console.error('API operation error:', error);
-        return new Response(JSON.stringify({ 
-          error: error.message || 'Internal Server Error' 
-        }), { 
+        return new Response(JSON.stringify({
+          error: error.message || 'Internal Server Error'
+        }), {
           status: error.message === 'Invalid input' ? 400 : 500,
           headers: { 'Content-Type': 'application/json' }
         });
