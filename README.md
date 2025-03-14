@@ -13,6 +13,17 @@
 
 ## 使用步骤
 
+- Fork 仓库
+- 创建 KV 命名空间
+- 创建 Worker
+- 绑定 KV 命名空间 KV_BINDING
+- 创建环境变量 PASSWORD
+- 绑定自定义域名
+
+### 参考截图
+
+**步骤不需要和我这个完全一致，只要能部署成功就行。我这里有一些错误，请忽略。**
+
 1. Fork 本项目
    ![fork](./images/fork.png)
 2. 创建 KV 命名空间
@@ -27,15 +38,18 @@
    ![bind kv](./images/bind-kv.png)
 7. 点击保存版本
    ![save](./images/save.png)
-8. 创建环境变量 PASSWORD
+8. 创建环境变量 PASSWORD，注意格式是英文大小写字母、数字或者符号，尽量搞复杂点
    ![create env](./images/create-env.png)
 9. 点击保存版本
    ![save](./images/save.png)
 10. 最终效果
     ![final](./images/final.png)
 11. 回到部署页，点击 `您的上一次构建失败。查看构建` 然后点击 `重试构建`
-    
- 
+
+12. 部署成功
+13. 绑定自定义域名
+    ![bind domain](./images/domain.png)
+
 ## 贡献指南
 
 - [ ] 实现定时检查过期短链功能
