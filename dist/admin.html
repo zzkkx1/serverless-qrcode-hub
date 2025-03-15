@@ -104,6 +104,36 @@
                 margin: 0.5rem 0;
             }
         }
+
+        /* 优化表格过渡效果 */
+        .table-responsive tbody {
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        .table-responsive.loading tbody {
+            opacity: 0.3;
+        }
+
+        /* 添加表格容器过渡效果 */
+        .table-responsive {
+            position: relative;
+            min-height: 100px;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #loading.visible {
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -222,6 +252,13 @@
             <h2 class="card-title text-xl mb-4">短链二维码管理</h2>
             <div id="loading" class="text-center py-4 hidden">
                 <span class="loading loading-spinner loading-lg"></span>
+            </div>
+
+            <!-- 添加筛选按钮组 -->
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button id="showAllBtn" class="btn btn-sm btn-primary">全部</button>
+                <button id="showExpiringBtn" class="btn btn-sm btn-warning">即将过期</button>
+                <button id="showExpiredBtn" class="btn btn-sm btn-error">已过期</button>
             </div>
 
             <!-- 新的添加表单区域 -->
@@ -356,6 +393,11 @@
 
                 // 添加全局错误处理
                 setupErrorHandling();
+
+                // 添加筛选按钮事件监听
+                document.getElementById('showAllBtn').addEventListener('click', () => loadMappings());
+                document.getElementById('showExpiringBtn').addEventListener('click', () => loadExpiringMappings('expiring'));
+                document.getElementById('showExpiredBtn').addEventListener('click', () => loadExpiringMappings('expired'));
             }
 
             // 添加全局错误处理
@@ -499,7 +541,12 @@
             }
 
             async function loadMappings() {
+                const tableContainer = document.querySelector('.table-responsive');
                 const loading = document.getElementById('loading');
+                
+                // 先添加加载状态
+                tableContainer.classList.add('loading');
+                loading.classList.add('visible');
                 loading.classList.remove('hidden');
 
                 try {
@@ -516,6 +563,11 @@
 
                     const data = await response.json();
                     allMappings = Object.entries(data.mappings);
+                    
+                    // 等待一小段时间再更新DOM，让过渡效果更自然
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    // 更新表格内容
                     renderCurrentPage();
 
                     // 更新分页信息
@@ -524,16 +576,26 @@
                     document.getElementById('currentPage').textContent = currentPage;
                     document.getElementById('prevPage').disabled = currentPage === 1;
                     document.getElementById('nextPage').disabled = currentPage === totalPages;
+
+                    // 更新按钮状态
+                    updateFilterButtons('all');
                 } catch (error) {
                     console.error('加载数据失败:', error);
                     showAlert('加载数据失败，请刷新页面重试');
                 } finally {
+                    // 等待一小段时间再移除加载状态
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    tableContainer.classList.remove('loading');
+                    loading.classList.remove('visible');
                     loading.classList.add('hidden');
                 }
             }
 
             function renderCurrentPage() {
                 const table = document.getElementById('mappingsTableBody');
+                // 清空现有内容
+                table.innerHTML = '';
+                
                 const fragment = document.createDocumentFragment();
 
                 const start = (currentPage - 1) * pageSize;
@@ -922,6 +984,89 @@
                 } catch (error) {
                     console.error('登出失败:', error);
                     showAlert('登出失败，请检查网络连接后重试');
+                }
+            }
+
+            // 添加加载即将过期映射的函数
+            async function loadExpiringMappings(type) {
+                const tableContainer = document.querySelector('.table-responsive');
+                const loading = document.getElementById('loading');
+                
+                // 先添加加载状态
+                tableContainer.classList.add('loading');
+                loading.classList.add('visible');
+                loading.classList.remove('hidden');
+
+                try {
+                    const response = await fetch('/api/expiring-mappings');
+
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error('加载数据失败');
+                    }
+
+                    const data = await response.json();
+                    const mappings = data[type] || [];
+                    
+                    // 转换数据格式以适配现有的渲染逻辑
+                    allMappings = mappings.map(m => [m.path, {
+                        name: m.name,
+                        target: m.target,
+                        expiry: m.expiry
+                    }]);
+
+                    // 等待一小段时间再更新DOM
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                    // 更新分页信息
+                    currentPage = 1;
+                    const totalPages = Math.ceil(allMappings.length / pageSize);
+                    document.getElementById('currentPage').textContent = currentPage;
+                    document.getElementById('prevPage').disabled = currentPage === 1;
+                    document.getElementById('nextPage').disabled = currentPage === totalPages;
+
+                    // 清空并重新渲染表格
+                    renderCurrentPage();
+
+                    // 更新按钮状态
+                    updateFilterButtons(type);
+                } catch (error) {
+                    console.error('加载数据失败:', error);
+                    showAlert('加载数据失败，请刷新页面重试');
+                } finally {
+                    // 等待一小段时间再移除加载状态
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    tableContainer.classList.remove('loading');
+                    loading.classList.remove('visible');
+                    loading.classList.add('hidden');
+                }
+            }
+
+            // 添加更新筛选按钮状态的函数
+            function updateFilterButtons(activeType) {
+                const allBtn = document.getElementById('showAllBtn');
+                const expiringBtn = document.getElementById('showExpiringBtn');
+                const expiredBtn = document.getElementById('showExpiredBtn');
+
+                // 重置所有按钮状态
+                [allBtn, expiringBtn, expiredBtn].forEach(btn => {
+                    btn.classList.remove('btn-active');
+                });
+
+                // 设置活动按钮状态
+                switch (activeType) {
+                    case 'expiring':
+                        expiringBtn.classList.add('btn-active');
+                        break;
+                    case 'expired':
+                        expiredBtn.classList.add('btn-active');
+                        break;
+                    default:
+                        allBtn.classList.add('btn-active');
                 }
             }
         });

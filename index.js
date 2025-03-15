@@ -125,6 +125,43 @@ async function updateMapping(originalPath, newPath, target, name, expiry) {
   await KV_BINDING.put(newPath, JSON.stringify(mapping));
 }
 
+async function getExpiringMappings() {
+  const mappings = {
+    expiring: [],  // 2天内过期
+    expired: []    // 已过期
+  };
+  let cursor = null;
+  const twoDaysFromNow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+
+  do {
+    const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
+    
+    for (const key of listResult.keys) {
+      const mapping = await KV_BINDING.get(key.name, { type: "json" });
+      if (mapping && mapping.expiry) {
+        const expiryDate = new Date(mapping.expiry);
+        const mappingInfo = {
+          path: key.name,
+          name: mapping.name,
+          target: mapping.target,
+          expiry: mapping.expiry
+        };
+        
+        if (expiryDate < now) {
+          mappings.expired.push(mappingInfo);
+        } else if (expiryDate <= twoDaysFromNow) {
+          mappings.expiring.push(mappingInfo);
+        }
+      }
+    }
+    
+    cursor = listResult.cursor;
+  } while (cursor);
+
+  return mappings;
+}
+
 export default {
   async fetch(request, env) {
     KV_BINDING = env.KV_BINDING;
@@ -162,6 +199,14 @@ export default {
       }
 
       try {
+        // 获取即将过期和已过期的映射
+        if (path === 'api/expiring-mappings') {
+          const result = await getExpiringMappings();
+          return new Response(JSON.stringify(result), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
         // 获取映射列表
         if (path === 'api/mappings') {
           const params = new URLSearchParams(url.search);
@@ -242,32 +287,16 @@ export default {
 
   async scheduled(controller, env, ctx) {
     KV_BINDING = env.KV_BINDING;
-    let cursor = null;
-    let expiredCount = 0;
-    let expiredMappings = [];
+    const result = await getExpiringMappings();
     
-    do {
-      const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
-      
-      for (const key of listResult.keys) {
-        const mapping = await KV_BINDING.get(key.name, { type: "json" });
-        if (mapping && mapping.expiry && new Date(mapping.expiry) < new Date()) {
-          expiredCount++;
-          expiredMappings.push({
-            path: key.name,
-            name: mapping.name,
-            target: mapping.target,
-            expiry: mapping.expiry
-          });
-        }
-      }
-      
-      cursor = listResult.cursor;
-    } while (cursor);
-
-    console.log(`Cron job report: Found ${expiredCount} expired mappings`);
-    if (expiredCount > 0) {
-      console.log('Expired mappings:', JSON.stringify(expiredMappings, null, 2));
+    console.log(`Cron job report: Found ${result.expired.length} expired mappings`);
+    if (result.expired.length > 0) {
+      console.log('Expired mappings:', JSON.stringify(result.expired, null, 2));
+    }
+    
+    console.log(`Found ${result.expiring.length} mappings expiring in 2 days`);
+    if (result.expiring.length > 0) {
+      console.log('Expiring soon mappings:', JSON.stringify(result.expiring, null, 2));
     }
   },
 
