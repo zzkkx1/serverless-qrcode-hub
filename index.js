@@ -33,25 +33,74 @@ function clearAuthCookie() {
 
 // KV 操作相关函数
 async function listMappings(page = 1, pageSize = 10) {
+  // 添加缓存键以存储总记录数
+  const TOTAL_COUNT_KEY = "__total_count";
+  let count;
+  
+  try {
+    // 尝试从缓存获取总数
+    count = await KV_BINDING.get(TOTAL_COUNT_KEY, { type: "json" });
+  } catch (e) {
+    count = null;
+  }
+
   const mappings = {};
-  let cursor = null;
-  let count = 0;
-
   const skip = (page - 1) * pageSize;
+  
+  // 如果请求第一页，或者跳过的记录数较少，使用现有逻辑
+  if (page === 1 || skip < 100) {
+    let cursor = null;
+    let processedCount = 0;
 
-  do {
-    const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
-
-    for (const key of listResult.keys) {
-      if (count >= skip && Object.keys(mappings).length < pageSize) {
-        const value = await KV_BINDING.get(key.name, { type: "json" });
-        mappings[key.name] = value;
+    do {
+      const listResult = await KV_BINDING.list({ cursor, limit: Math.min(1000, skip + pageSize) });
+      
+      for (const key of listResult.keys) {
+        if (processedCount >= skip && Object.keys(mappings).length < pageSize) {
+          const value = await KV_BINDING.get(key.name, { type: "json" });
+          mappings[key.name] = value;
+        }
+        processedCount++;
       }
-      count++;
+      
+      cursor = listResult.cursor;
+      // 如果没有缓存的总数，继续遍历以计算总数
+      if (count === null && cursor) {
+        const remaining = await KV_BINDING.list({ cursor, limit: 1000 });
+        processedCount += remaining.keys.length;
+        cursor = remaining.cursor;
+      }
+    } while (cursor && Object.keys(mappings).length < pageSize);
+    
+    // 更新总数缓存
+    if (count === null) {
+      count = processedCount;
+      await KV_BINDING.put(TOTAL_COUNT_KEY, JSON.stringify(count));
     }
-
-    cursor = listResult.cursor;
-  } while (cursor && Object.keys(mappings).length < pageSize);
+  } else {
+    // 对于大跨度的分页，直接使用 cursor 定位
+    let cursor = null;
+    const batchSize = 1000;
+    const batches = Math.floor(skip / batchSize);
+    
+    // 快速跳过整批次的记录
+    for (let i = 0; i < batches; i++) {
+      const listResult = await KV_BINDING.list({ cursor, limit: batchSize });
+      cursor = listResult.cursor;
+      if (!cursor) break;
+    }
+    
+    // 处理剩余的记录
+    if (cursor) {
+      const remainingSkip = skip % batchSize;
+      const listResult = await KV_BINDING.list({ cursor, limit: remainingSkip + pageSize });
+      
+      for (let i = remainingSkip; i < listResult.keys.length && Object.keys(mappings).length < pageSize; i++) {
+        const value = await KV_BINDING.get(listResult.keys[i].name, { type: "json" });
+        mappings[listResult.keys[i].name] = value;
+      }
+    }
+  }
 
   return {
     mappings,
@@ -83,6 +132,7 @@ async function createMapping(path, target, name, expiry) {
   };
 
   await KV_BINDING.put(path, JSON.stringify(mapping));
+  await updateTotalCount(1);
 }
 
 async function deleteMapping(path) {
@@ -96,6 +146,7 @@ async function deleteMapping(path) {
   }
 
   await KV_BINDING.delete(path);
+  await updateTotalCount(-1);
 }
 
 async function updateMapping(originalPath, newPath, target, name, expiry) {
@@ -123,6 +174,7 @@ async function updateMapping(originalPath, newPath, target, name, expiry) {
   };
 
   await KV_BINDING.put(newPath, JSON.stringify(mapping));
+  await updateTotalCount(1);
 }
 
 async function getExpiringMappings() {
@@ -160,6 +212,19 @@ async function getExpiringMappings() {
   } while (cursor);
 
   return mappings;
+}
+
+// 在创建、更新、删除操作后更新总数缓存
+async function updateTotalCount(change = 0) {
+  const TOTAL_COUNT_KEY = "__total_count";
+  try {
+    const currentCount = await KV_BINDING.get(TOTAL_COUNT_KEY, { type: "json" });
+    if (currentCount !== null) {
+      await KV_BINDING.put(TOTAL_COUNT_KEY, JSON.stringify(currentCount + change));
+    }
+  } catch (e) {
+    // 如果缓存不存在或出错，忽略更新
+  }
 }
 
 export default {
