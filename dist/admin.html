@@ -109,7 +109,7 @@
         .table-responsive tbody {
             transition: none;
         }
-        
+
         .table-responsive.loading tbody {
             opacity: 1;
         }
@@ -169,6 +169,23 @@
 
                 <button id="qr-download" class="btn btn-primary">下载二维码</button>
                 <button class="btn" onclick="document.getElementById('qr-modal').close()">关闭</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>关闭</button>
+        </form>
+    </dialog>
+
+    <!-- 在 body 开始处添加删除确认模态框 -->
+    <dialog id="delete-confirm-modal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">确认删除</h3>
+            <p class="py-4">确定要删除这个短链吗？此操作不可撤销。</p>
+            <div class="modal-action">
+                <form method="dialog" class="join">
+                    <button id="confirm-delete-btn" class="join-item btn btn-error">确认删除</button>
+                    <button class="join-item btn btn-primary">取消</button>
+                </form>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -249,16 +266,38 @@
 
     <div class="card bg-base-100 shadow-xl">
         <div class="card-body">
-            <h2 class="card-title text-xl mb-4">短链二维码管理</h2>
-            <div id="loading" class="text-center py-4 hidden">
-                <span class="loading loading-spinner loading-lg"></span>
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                <h2 class="card-title text-xl">短链二维码管理</h2>
+                <div class="join shadow-lg">
+                    <button id="showAllBtn" class="join-item btn btn-sm btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                        </svg>
+                        全部
+                    </button>
+                    <button id="showExpiringBtn" class="join-item btn btn-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        即将过期
+                    </button>
+                    <button id="showExpiredBtn" class="join-item btn btn-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        已过期
+                    </button>
+                </div>
             </div>
 
-            <!-- 添加筛选按钮组 -->
-            <div class="flex flex-wrap gap-2 mb-4">
-                <button id="showAllBtn" class="btn btn-sm btn-primary">全部</button>
-                <button id="showExpiringBtn" class="btn btn-sm btn-warning">即将过期</button>
-                <button id="showExpiredBtn" class="btn btn-sm btn-error">已过期</button>
+            <div id="loading" class="text-center py-4 hidden">
+                <span class="loading loading-spinner loading-lg"></span>
             </div>
 
             <!-- 新的添加表单区域 -->
@@ -422,10 +461,38 @@
                 // 添加全局错误处理
                 setupErrorHandling();
 
-                // 添加筛选按钮事件监听
-                document.getElementById('showAllBtn').addEventListener('click', () => loadMappings());
-                document.getElementById('showExpiringBtn').addEventListener('click', () => loadExpiringMappings('expiring'));
-                document.getElementById('showExpiredBtn').addEventListener('click', () => loadExpiringMappings('expired'));
+                // 添加筛选按钮状态管理
+                const filterButtons = {
+                    showAllBtn: { element: document.getElementById('showAllBtn'), class: 'btn-primary' },
+                    showExpiringBtn: { element: document.getElementById('showExpiringBtn'), class: 'btn-warning' },
+                    showExpiredBtn: { element: document.getElementById('showExpiredBtn'), class: 'btn-error' }
+                };
+
+                function updateFilterButtonStates(activeButtonId) {
+                    Object.entries(filterButtons).forEach(([id, { element, class: buttonClass }]) => {
+                        if (id === activeButtonId) {
+                            element.classList.add(buttonClass);
+                        } else {
+                            element.classList.remove(buttonClass);
+                        }
+                    });
+                }
+
+                // 修改筛选按钮的点击事件
+                document.getElementById('showAllBtn').addEventListener('click', () => {
+                    updateFilterButtonStates('showAllBtn');
+                    loadMappings();
+                });
+
+                document.getElementById('showExpiringBtn').addEventListener('click', () => {
+                    updateFilterButtonStates('showExpiringBtn');
+                    loadExpiringMappings('expiring');
+                });
+
+                document.getElementById('showExpiredBtn').addEventListener('click', () => {
+                    updateFilterButtonStates('showExpiredBtn');
+                    loadExpiringMappings('expired');
+                });
             }
 
             // 添加全局错误处理
@@ -571,7 +638,7 @@
             async function loadMappings() {
                 const tableBody = document.getElementById('mappingsTableBody');
                 const skeleton = document.getElementById('skeleton');
-                
+
                 // 显示骨架屏，隐藏表格内容
                 tableBody.style.display = 'none';
                 skeleton.classList.remove('hidden');
@@ -590,10 +657,10 @@
 
                     const data = await response.json();
                     allMappings = Object.entries(data.mappings);
-                    
+
                     // 等待一小段时间再更新DOM
                     await new Promise(resolve => setTimeout(resolve, 300));
-                    
+
                     // 更新表格内容
                     renderCurrentPage();
 
@@ -604,8 +671,6 @@
                     document.getElementById('prevPage').disabled = currentPage === 1;
                     document.getElementById('nextPage').disabled = currentPage === totalPages;
 
-                    // 更新按钮状态
-                    updateFilterButtons('all');
                 } catch (error) {
                     console.error('加载数据失败:', error);
                     showAlert('加载数据失败，请刷新页面重试');
@@ -620,7 +685,7 @@
                 const table = document.getElementById('mappingsTableBody');
                 // 清空现有内容
                 table.innerHTML = '';
-                
+
                 const fragment = document.createDocumentFragment();
 
                 const start = (currentPage - 1) * pageSize;
@@ -686,30 +751,48 @@
             }
 
             async function deleteMapping(path) {
-                try {
-                    const response = await fetch('/api/mapping', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ path })
-                    });
+                const modal = document.getElementById('delete-confirm-modal');
+                const confirmBtn = document.getElementById('confirm-delete-btn');
 
-                    if (response.status === 401) {
-                        window.location.href = '/login';
-                        return;
-                    }
+                // 创建一个 Promise 来处理用户的选择
+                return new Promise((resolve) => {
+                    const handleConfirm = async () => {
+                        try {
+                            const response = await fetch('/api/mapping', {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ path })
+                            });
 
-                    if (!response.ok) {
-                        const data = await response.json();
-                        showAlert(data.message || data.error || '删除失败，请重试');
-                        return;
-                    }
+                            if (response.status === 401) {
+                                window.location.href = '/login';
+                                return;
+                            }
 
-                    showAlert('删除成功', 'success');
-                    location.reload();
-                } catch (error) {
-                    console.error('删除失败:', error);
-                    showAlert('删除失败，请检查网络连接后重试');
-                }
+                            if (!response.ok) {
+                                const data = await response.json();
+                                showAlert(data.message || data.error || '删除失败，请重试');
+                                return;
+                            }
+
+                            showAlert('删除成功', 'success');
+                            location.reload();
+                        } catch (error) {
+                            console.error('删除失败:', error);
+                            showAlert('删除失败，请检查网络连接后重试');
+                        } finally {
+                            // 清理事件监听器
+                            confirmBtn.removeEventListener('click', handleConfirm);
+                            resolve();
+                        }
+                    };
+
+                    // 添加确认按钮的点击事件
+                    confirmBtn.addEventListener('click', handleConfirm);
+
+                    // 显示模态框
+                    modal.showModal();
+                });
             }
 
             // 修改生成二维码的函数
@@ -818,20 +901,22 @@
                 });
 
                 const actionsCell = document.createElement('td');
-                actionsCell.className = 'btn-group-responsive';
-                const buttons = [
-                    { text: '编辑', class: 'btn btn-warning btn-sm mr-2', handler: () => toggleEditMode(row) },
-                    { text: '删除', class: 'btn btn-error btn-sm mr-2', handler: () => deleteMapping(path) },
-                    { text: '二维码', class: 'btn btn-info btn-sm', handler: () => generateQRForMapping(window.location.origin + '/' + path, path) }
-                ];
+                actionsCell.innerHTML = `
+                    <div class="join">
+                        <button class="join-item btn btn-warning btn-sm">编辑</button>
+                        <button class="join-item btn btn-error btn-sm">删除</button>
+                        <button class="join-item btn btn-info btn-sm">二维码</button>
+                    </div>
+                `;
 
-                buttons.forEach(({ text, class: className, handler }) => {
-                    const button = document.createElement('button');
-                    button.textContent = text;
-                    button.className = className;
-                    button.onclick = handler;
-                    actionsCell.appendChild(button);
-                });
+                // 添加事件监听器
+                const [editBtn, deleteBtn, qrBtn] = actionsCell.querySelectorAll('button');
+                editBtn.onclick = () => toggleEditMode(row);
+                deleteBtn.onclick = (e) => {
+                    e.preventDefault();
+                    deleteMapping(path);
+                };
+                qrBtn.onclick = () => generateQRForMapping(window.location.origin + '/' + path, path);
 
                 row.appendChild(actionsCell);
                 return row;
@@ -850,9 +935,21 @@
                     cells[2].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[2].dataset.original}">`;
                     cells[3].innerHTML = `<input type="date" class="input input-bordered input-sm w-full" value="${cells[3].dataset.original}">`;
 
-                    const editButton = cells[4].children[0];
-                    editButton.textContent = '保存';
-                    editButton.className = 'btn btn-success btn-sm mr-2';
+                    // 修改按钮组的 HTML，保持 join 样式
+                    const actionsCell = cells[4];
+                    actionsCell.innerHTML = `
+                        <div class="join">
+                            <button class="join-item btn btn-success btn-sm">保存</button>
+                            <button class="join-item btn btn-error btn-sm">删除</button>
+                            <button class="join-item btn btn-info btn-sm">二维码</button>
+                        </div>
+                    `;
+
+                    // 重新绑定事件监听器
+                    const [saveBtn, deleteBtn, qrBtn] = actionsCell.querySelectorAll('button');
+                    saveBtn.onclick = () => toggleEditMode(row);
+                    deleteBtn.onclick = () => deleteMapping(cells[1].dataset.original);
+                    qrBtn.onclick = () => generateQRForMapping(window.location.origin + '/' + cells[1].dataset.original, cells[1].dataset.original);
                 } else {
                     // 获取新值
                     const newName = cells[0].querySelector('input').value;
@@ -885,7 +982,6 @@
                 }
             }
 
-            // 添加恢复行显示的辅助函数
             function restoreRow(row) {
                 const cells = row.cells;
                 cells[0].textContent = cells[0].dataset.original;
@@ -893,9 +989,21 @@
                 cells[2].textContent = cells[2].dataset.original;
                 cells[3].textContent = cells[3].dataset.original || '永久有效';
 
-                const editButton = cells[4].children[0];
-                editButton.textContent = '编辑';
-                editButton.className = 'btn btn-warning btn-sm mr-2';
+                // 恢复按钮组，保持 join 样式
+                const actionsCell = cells[4];
+                actionsCell.innerHTML = `
+                    <div class="join">
+                        <button class="join-item btn btn-warning btn-sm">编辑</button>
+                        <button class="join-item btn btn-error btn-sm">删除</button>
+                        <button class="join-item btn btn-info btn-sm">二维码</button>
+                    </div>
+                `;
+
+                // 重新绑定事件监听器
+                const [editBtn, deleteBtn, qrBtn] = actionsCell.querySelectorAll('button');
+                editBtn.onclick = () => toggleEditMode(row);
+                deleteBtn.onclick = () => deleteMapping(cells[1].dataset.original);
+                qrBtn.onclick = () => generateQRForMapping(window.location.origin + '/' + cells[1].dataset.original, cells[1].dataset.original);
 
                 row.classList.remove('editing');
             }
@@ -932,7 +1040,7 @@
                 const html = document.documentElement;
                 const currentTheme = localStorage.getItem('theme') || 'system';
                 let newTheme;
-                
+
                 // 循环切换：system -> light -> dark -> system
                 switch (currentTheme) {
                     case 'system':
@@ -988,7 +1096,7 @@
 
             // 初始化主题图标
             updateThemeIcon(localStorage.getItem('theme') || 'system');
-            
+
             let allMappings = [];
             let currentPage = 1;
             let pageSize = 10;
@@ -1016,7 +1124,7 @@
             async function loadExpiringMappings(type) {
                 const tableBody = document.getElementById('mappingsTableBody');
                 const skeleton = document.getElementById('skeleton');
-                
+
                 // 显示骨架屏，隐藏表格内容
                 tableBody.style.display = 'none';
                 skeleton.classList.remove('hidden');
@@ -1035,7 +1143,7 @@
 
                     const data = await response.json();
                     const mappings = data[type] || [];
-                    
+
                     // 转换数据格式以适配现有的渲染逻辑
                     allMappings = mappings.map(m => [m.path, {
                         name: m.name,
@@ -1056,8 +1164,6 @@
                     // 清空并重新渲染表格
                     renderCurrentPage();
 
-                    // 更新按钮状态
-                    updateFilterButtons(type);
                 } catch (error) {
                     console.error('加载数据失败:', error);
                     showAlert('加载数据失败，请刷新页面重试');
@@ -1068,29 +1174,6 @@
                 }
             }
 
-            // 添加更新筛选按钮状态的函数
-            function updateFilterButtons(activeType) {
-                const allBtn = document.getElementById('showAllBtn');
-                const expiringBtn = document.getElementById('showExpiringBtn');
-                const expiredBtn = document.getElementById('showExpiredBtn');
-
-                // 重置所有按钮状态
-                [allBtn, expiringBtn, expiredBtn].forEach(btn => {
-                    btn.classList.remove('btn-active');
-                });
-
-                // 设置活动按钮状态
-                switch (activeType) {
-                    case 'expiring':
-                        expiringBtn.classList.add('btn-active');
-                        break;
-                    case 'expired':
-                        expiredBtn.classList.add('btn-active');
-                        break;
-                    default:
-                        allBtn.classList.add('btn-active');
-                }
-            }
         });
     </script>
 </body>
