@@ -935,20 +935,20 @@
                     cells[2].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[2].dataset.original}">`;
                     cells[3].innerHTML = `<input type="date" class="input input-bordered input-sm w-full" value="${cells[3].dataset.original}">`;
 
-                    // 修改按钮组的 HTML，保持 join 样式
+                    // 修改按钮组，将删除按钮改为取消按钮
                     const actionsCell = cells[4];
                     actionsCell.innerHTML = `
                         <div class="join">
                             <button class="join-item btn btn-success btn-sm">保存</button>
-                            <button class="join-item btn btn-error btn-sm">删除</button>
+                            <button class="join-item btn btn-primary btn-sm">取消</button>
                             <button class="join-item btn btn-info btn-sm">二维码</button>
                         </div>
                     `;
 
                     // 重新绑定事件监听器
-                    const [saveBtn, deleteBtn, qrBtn] = actionsCell.querySelectorAll('button');
+                    const [saveBtn, cancelBtn, qrBtn] = actionsCell.querySelectorAll('button');
                     saveBtn.onclick = () => toggleEditMode(row);
-                    deleteBtn.onclick = () => deleteMapping(cells[1].dataset.original);
+                    cancelBtn.onclick = () => restoreRow(row); // 直接调用 restoreRow 取消编辑
                     qrBtn.onclick = () => generateQRForMapping(window.location.origin + '/' + cells[1].dataset.original, cells[1].dataset.original);
                 } else {
                     // 获取新值

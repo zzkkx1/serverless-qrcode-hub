@@ -56,7 +56,6 @@
 10. 最终效果
     ![final](./images/final.png)
 11. 回到部署页，点击 `您的上一次构建失败。查看构建` 然后点击 `重试构建`
-
 12. 部署成功
 13. 绑定自定义域名
     ![bind domain](./images/domain.png)
