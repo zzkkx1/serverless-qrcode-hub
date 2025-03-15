@@ -11,6 +11,15 @@
 - 😋 可当短链接生成器
 - ☁️ 无需服务器
 
+## 预览图
+
+- 登录
+  ![preview-login](./images/preview-login.png)
+- 管理后台
+  ![preview-admin](./images/preview-admin.png)
+- 生成二维码
+  ![preview-qr](./images/preview-qr.png)
+
 ## 使用步骤
 
 - Fork 仓库

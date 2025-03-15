@@ -131,6 +131,11 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname.slice(1);
 
+    // 根目录跳转到 管理后台
+    if (path === '') {
+      return Response.redirect(url.origin + '/admin.html', 302);
+    }
+
     // API 路由处理
     if (path.startsWith('api/')) {
       // 登录 API

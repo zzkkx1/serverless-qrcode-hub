@@ -1,6 +1,11 @@
 name = "serverless-qrcode-hub"
 main = "index.js"
-compatibility_date = "2024-09-23"
+kv_namespaces = [
+    { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" },
+]
+
+[vars]
+PASSWORD = "123456"
 
 [assets]
 directory = "./dist"
