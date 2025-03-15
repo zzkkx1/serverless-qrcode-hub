@@ -107,11 +107,11 @@
 
         /* 优化表格过渡效果 */
         .table-responsive tbody {
-            transition: opacity 0.3s ease-in-out;
+            transition: none;
         }
         
         .table-responsive.loading tbody {
-            opacity: 0.3;
+            opacity: 1;
         }
 
         /* 添加表格容器过渡效果 */
@@ -295,6 +295,34 @@
             </div>
 
             <div class="overflow-x-auto table-responsive">
+                <!-- 添加骨架屏 -->
+                <div id="skeleton" class="hidden">
+                    <div class="skeleton h-4 w-28 mb-4"></div>
+                    <div class="space-y-4">
+                        <div class="flex gap-4">
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                            <div class="skeleton h-4 w-1/5"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <table class="table table-zebra w-full">
                     <thead>
                         <tr>
@@ -541,13 +569,12 @@
             }
 
             async function loadMappings() {
-                const tableContainer = document.querySelector('.table-responsive');
-                const loading = document.getElementById('loading');
+                const tableBody = document.getElementById('mappingsTableBody');
+                const skeleton = document.getElementById('skeleton');
                 
-                // 先添加加载状态
-                tableContainer.classList.add('loading');
-                loading.classList.add('visible');
-                loading.classList.remove('hidden');
+                // 显示骨架屏，隐藏表格内容
+                tableBody.style.display = 'none';
+                skeleton.classList.remove('hidden');
 
                 try {
                     const response = await fetch(`/api/mappings?page=${currentPage}&pageSize=${pageSize}`);
@@ -564,8 +591,8 @@
                     const data = await response.json();
                     allMappings = Object.entries(data.mappings);
                     
-                    // 等待一小段时间再更新DOM，让过渡效果更自然
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    // 等待一小段时间再更新DOM
+                    await new Promise(resolve => setTimeout(resolve, 300));
                     
                     // 更新表格内容
                     renderCurrentPage();
@@ -583,11 +610,9 @@
                     console.error('加载数据失败:', error);
                     showAlert('加载数据失败，请刷新页面重试');
                 } finally {
-                    // 等待一小段时间再移除加载状态
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    tableContainer.classList.remove('loading');
-                    loading.classList.remove('visible');
-                    loading.classList.add('hidden');
+                    // 隐藏骨架屏，显示表格内容
+                    skeleton.classList.add('hidden');
+                    tableBody.style.display = '';
                 }
             }
 
@@ -989,13 +1014,12 @@
 
             // 添加加载即将过期映射的函数
             async function loadExpiringMappings(type) {
-                const tableContainer = document.querySelector('.table-responsive');
-                const loading = document.getElementById('loading');
+                const tableBody = document.getElementById('mappingsTableBody');
+                const skeleton = document.getElementById('skeleton');
                 
-                // 先添加加载状态
-                tableContainer.classList.add('loading');
-                loading.classList.add('visible');
-                loading.classList.remove('hidden');
+                // 显示骨架屏，隐藏表格内容
+                tableBody.style.display = 'none';
+                skeleton.classList.remove('hidden');
 
                 try {
                     const response = await fetch('/api/expiring-mappings');
@@ -1020,7 +1044,7 @@
                     }]);
 
                     // 等待一小段时间再更新DOM
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, 300));
 
                     // 更新分页信息
                     currentPage = 1;
@@ -1038,11 +1062,9 @@
                     console.error('加载数据失败:', error);
                     showAlert('加载数据失败，请刷新页面重试');
                 } finally {
-                    // 等待一小段时间再移除加载状态
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    tableContainer.classList.remove('loading');
-                    loading.classList.remove('visible');
-                    loading.classList.add('hidden');
+                    // 隐藏骨架屏，显示表格内容
+                    skeleton.classList.add('hidden');
+                    tableBody.style.display = '';
                 }
             }
 
