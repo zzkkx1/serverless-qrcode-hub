@@ -2,10 +2,6 @@ name = "serverless-qrcode-hub"
 main = "index.js"
 compatibility_date = "2025-03-15"
 
-kv_namespaces = [
-    { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" },
-]
-
 [env.dev]
 kv_namespaces = [
     { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" },
