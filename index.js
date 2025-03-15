@@ -240,4 +240,26 @@ export default {
     }
   },
 
+  async scheduled(controller, env, ctx) {
+    KV_BINDING = env.KV_BINDING;
+    let cursor = null;
+    let deletedCount = 0;
+    
+    do {
+      const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
+      
+      for (const key of listResult.keys) {
+        const mapping = await KV_BINDING.get(key.name, { type: "json" });
+        if (mapping && mapping.expiry && new Date(mapping.expiry) < new Date()) {
+          await KV_BINDING.delete(key.name);
+          deletedCount++;
+        }
+      }
+      
+      cursor = listResult.cursor;
+    } while (cursor);
+
+    console.log(`Cron job completed: Deleted ${deletedCount} expired mappings`);
+  },
+
 };

@@ -4,8 +4,14 @@ compatibility_date = "2025-03-15"
 
 [env.dev]
 kv_namespaces = [
-  { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" }
+    { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" },
 ]
+
+[env.dev.triggers]
+crons = ["*/10 * * * * *"]
+
+[triggers]
+crons = ["0 2 */1 * *"]
 
 [assets]
 directory = "./dist"
