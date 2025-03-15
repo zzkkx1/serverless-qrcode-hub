@@ -6,12 +6,23 @@
         // 在页面渲染前就设置主题
         (function () {
             const savedTheme = localStorage.getItem('theme');
-            if (savedTheme) {
+            if (savedTheme === 'system') {
+                // 跟随系统设置
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } else if (savedTheme) {
                 document.documentElement.setAttribute('data-theme', savedTheme);
-            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                document.documentElement.setAttribute('data-theme', 'dark');
             } else {
-                document.documentElement.setAttribute('data-theme', 'light');
+                // 默认跟随系统
+                localStorage.setItem('theme', 'system');
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
             }
         })();
     </script>
@@ -141,7 +152,7 @@
             <h1 class="text-2xl font-bold text-primary">管理面板</h1>
         </div>
         <div class="flex gap-2 justify-center md:justify-end">
-            <button id="themeToggleBtn" class="btn btn-ghost">
+            <button id="themeToggleBtn" class="btn btn-ghost btn-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                     class="w-6 h-6">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -832,22 +843,65 @@
             // 修改 toggleTheme 函数
             function toggleTheme() {
                 const html = document.documentElement;
-                const currentTheme = html.getAttribute('data-theme');
-                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-                html.setAttribute('data-theme', newTheme);
+                const currentTheme = localStorage.getItem('theme') || 'system';
+                let newTheme;
+                
+                // 循环切换：system -> light -> dark -> system
+                switch (currentTheme) {
+                    case 'system':
+                        newTheme = 'light';
+                        break;
+                    case 'light':
+                        newTheme = 'dark';
+                        break;
+                    case 'dark':
+                        newTheme = 'system';
+                        break;
+                    default:
+                        newTheme = 'system';
+                }
+
                 localStorage.setItem('theme', newTheme);
+
+                // 设置实际主题
+                if (newTheme === 'system') {
+                    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    html.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+                } else {
+                    html.setAttribute('data-theme', newTheme);
+                }
+
                 updateThemeIcon(newTheme);
             }
 
             function updateThemeIcon(theme) {
                 const iconPath = themeToggleBtn.querySelector('path');
-                if (theme === 'dark') {
-                    iconPath.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z');
-                } else {
-                    iconPath.setAttribute('d', 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z');
+                switch (theme) {
+                    case 'system':
+                        // 显示系统图标（电脑显示器）
+                        iconPath.setAttribute('d', 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z');
+                        break;
+                    case 'dark':
+                        // 显示月亮图标
+                        iconPath.setAttribute('d', 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z');
+                        break;
+                    case 'light':
+                        // 显示太阳图标
+                        iconPath.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z');
+                        break;
                 }
             }
 
+            // 添加系统主题变化监听
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (localStorage.getItem('theme') === 'system') {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+                }
+            });
+
+            // 初始化主题图标
+            updateThemeIcon(localStorage.getItem('theme') || 'system');
+            
             let allMappings = [];
             let currentPage = 1;
             let pageSize = 10;
