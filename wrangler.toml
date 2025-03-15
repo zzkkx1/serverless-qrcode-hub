@@ -3,7 +3,8 @@ main = "index.js"
 compatibility_date = "2025-03-15"
 
 kv_namespaces = [
-    { binding = "KV_BINDING", id = "用你的 KV 命名空间 ID 替换这个 ID" },
+    # 注意：将下面的 id 替换为你自己拷贝的 KV 命名空间 id 才能正常使用！
+    { binding = "KV_BINDING", id = "1861b1f17ac346e9aca647e7d4a4c143" },
 ]
 
 [env.dev]
