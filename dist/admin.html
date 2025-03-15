@@ -556,31 +556,104 @@
                     const codeReader = new ZXing.BrowserMultiFormatReader();
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    canvas.width = img.naturalWidth;
-                    canvas.height = img.naturalHeight;
-                    ctx.drawImage(img, 0, 0);
+                    
+                    // 调整画布大小，确保图像质量
+                    const maxSize = 1024; // 限制最大尺寸
+                    let width = img.naturalWidth;
+                    let height = img.naturalHeight;
+                    
+                    // 保持宽高比进行缩放
+                    if (width > maxSize || height > maxSize) {
+                        if (width > height) {
+                            height = Math.floor(height * (maxSize / width));
+                            width = maxSize;
+                        } else {
+                            width = Math.floor(width * (maxSize / height));
+                            height = maxSize;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // 使用更好的图像渲染设置
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    
+                    // 绘制图像
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // 尝试增强对比度
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+                    
+                    for (let i = 0; i < data.length; i += 4) {
+                        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                        const threshold = 128;
+                        
+                        // 二值化处理
+                        const value = avg > threshold ? 255 : 0;
+                        data[i] = data[i + 1] = data[i + 2] = value;
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
 
-                    const blob = await new Promise(resolve => canvas.toBlob(resolve));
+                    // 创建新的 Blob 并进行解码
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
                     const imageUrl = URL.createObjectURL(blob);
-                    const result = await codeReader.decodeFromImageUrl(imageUrl);
-                    URL.revokeObjectURL(imageUrl);
-
-                    const qrResult = document.getElementById('qr-result');
-                    if (result) {
-                        const decodedText = result.text;
-                        document.getElementById('decoded-text').textContent = decodedText;
-                        qrResult.classList.remove('hidden');
-
-                        // 自动填充到目标 URL 输入框
-                        document.getElementById('newTarget').value = decodedText;
-                        showAlert('二维码识别成功', 'success');
-                    } else {
-                        showAlert('未能识别二维码，请确保图片清晰且包含有效的二维码');
-                        qrResult.classList.add('hidden');
+                    
+                    try {
+                        const result = await codeReader.decodeFromImageUrl(imageUrl);
+                        URL.revokeObjectURL(imageUrl);
+                        
+                        if (result) {
+                            const decodedText = result.text;
+                            document.getElementById('decoded-text').textContent = decodedText;
+                            document.getElementById('qr-result').classList.remove('hidden');
+                            
+                            // 自动填充到目标 URL 输入框
+                            document.getElementById('newTarget').value = decodedText;
+                            showAlert('二维码识别成功', 'success');
+                        }
+                    } catch (decodeError) {
+                        // 如果第一次识别失败，尝试不同的图像处理方式
+                        try {
+                            // 重置画布
+                            ctx.clearRect(0, 0, width, height);
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // 尝试反转颜色
+                            const imageData = ctx.getImageData(0, 0, width, height);
+                            const data = imageData.data;
+                            for (let i = 0; i < data.length; i += 4) {
+                                data[i] = 255 - data[i];         // 红
+                                data[i + 1] = 255 - data[i + 1]; // 绿
+                                data[i + 2] = 255 - data[i + 2]; // 蓝
+                            }
+                            ctx.putImageData(imageData, 0, 0);
+                            
+                            const newBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+                            const newImageUrl = URL.createObjectURL(newBlob);
+                            
+                            const result = await codeReader.decodeFromImageUrl(newImageUrl);
+                            URL.revokeObjectURL(newImageUrl);
+                            
+                            if (result) {
+                                const decodedText = result.text;
+                                document.getElementById('decoded-text').textContent = decodedText;
+                                document.getElementById('qr-result').classList.remove('hidden');
+                                document.getElementById('newTarget').value = decodedText;
+                                showAlert('二维码识别成功', 'success');
+                            }
+                        } catch (finalError) {
+                            console.error('二维码识别错误:', finalError);
+                            showAlert('无法识别二维码，请确保图片清晰且包含有效的二维码');
+                            document.getElementById('qr-result').classList.add('hidden');
+                        }
                     }
                 } catch (error) {
-                    console.error('二维码识别错误:', error);
-                    showAlert('二维码识别失败，请确保图片清晰且包含有效的二维码');
+                    console.error('图像处理错误:', error);
+                    showAlert('处理图片时出错，请重试');
                     document.getElementById('qr-result').classList.add('hidden');
                 }
             }
