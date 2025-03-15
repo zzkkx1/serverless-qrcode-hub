@@ -1,6 +1,6 @@
 let KV_BINDING;
 const banPath = [
-  'login', 'admin',
+  'login', 'admin', '__total_count',
   // static files
   'admin.html', 'login.html',
   'daisyui@5.css', 'tailwindcss@4.js',
@@ -33,12 +33,10 @@ function clearAuthCookie() {
 
 // KV 操作相关函数
 async function listMappings(page = 1, pageSize = 10) {
-  // 添加缓存键以存储总记录数
   const TOTAL_COUNT_KEY = "__total_count";
   let count;
   
   try {
-    // 尝试从缓存获取总数
     count = await KV_BINDING.get(TOTAL_COUNT_KEY, { type: "json" });
   } catch (e) {
     count = null;
@@ -46,8 +44,8 @@ async function listMappings(page = 1, pageSize = 10) {
 
   const mappings = {};
   const skip = (page - 1) * pageSize;
+  let validCount = 0;  // 用于记录有效的映射数量
   
-  // 如果请求第一页，或者跳过的记录数较少，使用现有逻辑
   if (page === 1 || skip < 100) {
     let cursor = null;
     let processedCount = 0;
@@ -56,49 +54,55 @@ async function listMappings(page = 1, pageSize = 10) {
       const listResult = await KV_BINDING.list({ cursor, limit: Math.min(1000, skip + pageSize) });
       
       for (const key of listResult.keys) {
-        if (processedCount >= skip && Object.keys(mappings).length < pageSize) {
-          const value = await KV_BINDING.get(key.name, { type: "json" });
-          mappings[key.name] = value;
+        // 跳过 banPath 中的路径
+        if (!banPath.includes(key.name)) {
+          if (processedCount >= skip && Object.keys(mappings).length < pageSize) {
+            const value = await KV_BINDING.get(key.name, { type: "json" });
+            mappings[key.name] = value;
+          }
+          processedCount++;
         }
-        processedCount++;
       }
       
       cursor = listResult.cursor;
-      // 如果没有缓存的总数，继续遍历以计算总数
       if (count === null && cursor) {
         const remaining = await KV_BINDING.list({ cursor, limit: 1000 });
-        processedCount += remaining.keys.length;
+        // 计算剩余有效记录数（排除 banPath）
+        processedCount += remaining.keys.filter(key => !banPath.includes(key.name)).length;
         cursor = remaining.cursor;
       }
     } while (cursor && Object.keys(mappings).length < pageSize);
     
-    // 更新总数缓存
     if (count === null) {
       count = processedCount;
       await KV_BINDING.put(TOTAL_COUNT_KEY, JSON.stringify(count));
     }
   } else {
-    // 对于大跨度的分页，直接使用 cursor 定位
     let cursor = null;
     const batchSize = 1000;
-    const batches = Math.floor(skip / batchSize);
+    let validSkip = skip;
+    let processedValid = 0;
     
-    // 快速跳过整批次的记录
-    for (let i = 0; i < batches; i++) {
+    // 继续获取数据直到找到足够的有效记录
+    while (processedValid < validSkip + pageSize) {
       const listResult = await KV_BINDING.list({ cursor, limit: batchSize });
-      cursor = listResult.cursor;
-      if (!cursor) break;
-    }
-    
-    // 处理剩余的记录
-    if (cursor) {
-      const remainingSkip = skip % batchSize;
-      const listResult = await KV_BINDING.list({ cursor, limit: remainingSkip + pageSize });
       
-      for (let i = remainingSkip; i < listResult.keys.length && Object.keys(mappings).length < pageSize; i++) {
-        const value = await KV_BINDING.get(listResult.keys[i].name, { type: "json" });
-        mappings[listResult.keys[i].name] = value;
+      // 过滤掉 banPath 中的路径
+      const validKeys = listResult.keys.filter(key => !banPath.includes(key.name));
+      
+      // 如果已经跳过了足够的记录，开始收集数据
+      if (processedValid + validKeys.length > validSkip) {
+        const startIndex = validSkip - processedValid;
+        for (let i = startIndex; i < validKeys.length && Object.keys(mappings).length < pageSize; i++) {
+          const value = await KV_BINDING.get(validKeys[i].name, { type: "json" });
+          mappings[validKeys[i].name] = value;
+        }
       }
+      
+      processedValid += validKeys.length;
+      cursor = listResult.cursor;
+      
+      if (!cursor) break;
     }
   }
 
@@ -188,7 +192,7 @@ async function getExpiringMappings() {
 
   do {
     const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
-    
+
     for (const key of listResult.keys) {
       const mapping = await KV_BINDING.get(key.name, { type: "json" });
       if (mapping && mapping.expiry) {
@@ -199,7 +203,7 @@ async function getExpiringMappings() {
           target: mapping.target,
           expiry: mapping.expiry
         };
-        
+
         if (expiryDate < now) {
           mappings.expired.push(mappingInfo);
         } else if (expiryDate <= twoDaysFromNow) {
@@ -207,7 +211,7 @@ async function getExpiringMappings() {
         }
       }
     }
-    
+
     cursor = listResult.cursor;
   } while (cursor);
 
@@ -353,12 +357,12 @@ export default {
   async scheduled(controller, env, ctx) {
     KV_BINDING = env.KV_BINDING;
     const result = await getExpiringMappings();
-    
+
     console.log(`Cron job report: Found ${result.expired.length} expired mappings`);
     if (result.expired.length > 0) {
       console.log('Expired mappings:', JSON.stringify(result.expired, null, 2));
     }
-    
+
     console.log(`Found ${result.expiring.length} mappings expiring in 2 days`);
     if (result.expiring.length > 0) {
       console.log('Expiring soon mappings:', JSON.stringify(result.expiring, null, 2));
