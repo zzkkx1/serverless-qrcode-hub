@@ -194,6 +194,7 @@
     </dialog>
 
     <div id="alertContainer" class="fixed left-1/2 transform -translate-x-1/2 z-50"></div>
+    <input type="hidden" id="qrCodeData">
     <div class="navbar bg-base-100 shadow-lg rounded-box mb-8">
         <div class="flex-1 justify-center md:justify-start">
             <h1 class="text-2xl font-bold text-primary">管理面板</h1>
@@ -246,18 +247,80 @@
 
     <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
-            <h2 class="card-title text-xl mb-4">二维码识别</h2>
-            <div id="qr-upload-area"
-                class="border-2 border-dashed border-primary p-8 text-center rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
-                <p class="text-lg">点击上传或拖拽二维码图片到此处</p>
-                <input type="file" id="qr-file" accept="image/*" class="hidden">
-            </div>
-            <div id="qr-result" class="card bg-base-200 hidden mt-4">
-                <div class="card-body">
-                    <h3 class="card-title text-lg">识别结果（已自动填充到下方的目标 URL处）</h3>
-                    <p id="decoded-text" class="text-primary font-mono break-all"></p>
-                    <div class="card-actions justify-end">
-                        <button id="copy-btn" class="btn btn-success">复制链接</button>
+            <h2 class="card-title text-xl mb-4">二维码识别与短链创建</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- 左侧：二维码识别区域 -->
+                <div>
+                    <div id="qr-upload-area"
+                        class="border-2 border-dashed border-primary p-8 text-center rounded-lg cursor-pointer hover:bg-base-200 transition-colors">
+                        <p class="text-lg">点击上传或拖拽二维码图片到此处</p>
+                        <input type="file" id="qr-file" accept="image/*" class="hidden">
+                    </div>
+                    <div id="qr-result" class="card bg-base-200 hidden mt-4">
+                        <div class="card-body">
+                            <h3 class="card-title text-lg">识别结果（已自动填充到右侧的目标 URL处）</h3>
+                            <p id="decoded-text" class="text-primary font-mono break-all"></p>
+                            <div class="card-actions justify-end">
+                                <button id="copy-btn" class="btn btn-success">复制链接</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 右侧：短链创建表单 -->
+                <div class="card bg-base-200 p-4">
+                    <div class="space-y-4">
+                        <div>
+                            <label for="newName" class="label">
+                                <span class="label-text">条目名称</span>
+                            </label>
+                            <input type="text" id="newName" placeholder="条目名称，例:音乐群1"
+                                class="input input-bordered w-full">
+                        </div>
+                        <div>
+                            <label for="newPath" class="label">
+                                <span class="label-text">短链名</span>
+                            </label>
+                            <input type="text" id="newPath" placeholder="短链名，例:music1"
+                                class="input input-bordered w-full">
+                        </div>
+                        <div>
+                            <label for="newTarget" class="label">
+                                <span class="label-text">目标URL</span>
+                            </label>
+                            <input type="text" id="newTarget" placeholder="目标URL，例:https://x.com/xxx"
+                                class="input input-bordered w-full">
+                        </div>
+                        <div>
+                            <label for="newExpiry" class="label">
+                                <span class="label-text">失效日期</span>
+                            </label>
+                            <input type="date" id="newExpiry" class="input input-bordered w-full">
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" id="newEnabled" class="toggle toggle-primary" checked>
+                                <span class="label-text">启用该短链</span>
+                                <div class="tooltip tooltip-right" data-tip="禁用后访问短链将返回404">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        class="w-4 h-4 stroke-current">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </label>
+                            <label class="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" id="newIsWechat" class="toggle toggle-primary">
+                                <span class="label-text">微信二维码</span>
+                                <div class="tooltip tooltip-right" data-tip="如果是微信群二维码，将使用活码页面展示原二维码">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                        class="w-4 h-4 stroke-current">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </label>
+                        </div>
+                        <button id="addMappingBtn" class="btn btn-primary w-full">添加短链二维码</button>
                     </div>
                 </div>
             </div>
@@ -542,10 +605,20 @@
                     return;
                 }
 
+                // 清除之前的二维码数据
+                document.getElementById('qrCodeData').value = '';
+                document.getElementById('qr-result').classList.add('hidden');
+                document.getElementById('decoded-text').textContent = '';
+                document.getElementById('newTarget').value = '';
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
-                    img.onload = () => decodeQR(img);
+                    img.onload = () => {
+                        decodeQR(img);
+                        // 保存原始二维码数据用于微信二维码
+                        document.getElementById('qrCodeData').value = e.target.result;
+                    };
                     img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
@@ -556,12 +629,12 @@
                     const codeReader = new ZXing.BrowserMultiFormatReader();
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    
+
                     // 调整画布大小，确保图像质量
                     const maxSize = 1024; // 限制最大尺寸
                     let width = img.naturalWidth;
                     let height = img.naturalHeight;
-                    
+
                     // 保持宽高比进行缩放
                     if (width > maxSize || height > maxSize) {
                         if (width > height) {
@@ -572,45 +645,45 @@
                             height = maxSize;
                         }
                     }
-                    
+
                     canvas.width = width;
                     canvas.height = height;
-                    
+
                     // 使用更好的图像渲染设置
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
-                    
+
                     // 绘制图像
                     ctx.drawImage(img, 0, 0, width, height);
-                    
+
                     // 尝试增强对比度
                     const imageData = ctx.getImageData(0, 0, width, height);
                     const data = imageData.data;
-                    
+
                     for (let i = 0; i < data.length; i += 4) {
                         const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
                         const threshold = 128;
-                        
+
                         // 二值化处理
                         const value = avg > threshold ? 255 : 0;
                         data[i] = data[i + 1] = data[i + 2] = value;
                     }
-                    
+
                     ctx.putImageData(imageData, 0, 0);
 
                     // 创建新的 Blob 并进行解码
                     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
                     const imageUrl = URL.createObjectURL(blob);
-                    
+
                     try {
                         const result = await codeReader.decodeFromImageUrl(imageUrl);
                         URL.revokeObjectURL(imageUrl);
-                        
+
                         if (result) {
                             const decodedText = result.text;
                             document.getElementById('decoded-text').textContent = decodedText;
                             document.getElementById('qr-result').classList.remove('hidden');
-                            
+
                             // 自动填充到目标 URL 输入框
                             document.getElementById('newTarget').value = decodedText;
                             showAlert('二维码识别成功', 'success');
@@ -621,7 +694,7 @@
                             // 重置画布
                             ctx.clearRect(0, 0, width, height);
                             ctx.drawImage(img, 0, 0, width, height);
-                            
+
                             // 尝试反转颜色
                             const imageData = ctx.getImageData(0, 0, width, height);
                             const data = imageData.data;
@@ -631,13 +704,13 @@
                                 data[i + 2] = 255 - data[i + 2]; // 蓝
                             }
                             ctx.putImageData(imageData, 0, 0);
-                            
+
                             const newBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
                             const newImageUrl = URL.createObjectURL(newBlob);
-                            
+
                             const result = await codeReader.decodeFromImageUrl(newImageUrl);
                             URL.revokeObjectURL(newImageUrl);
-                            
+
                             if (result) {
                                 const decodedText = result.text;
                                 document.getElementById('decoded-text').textContent = decodedText;
@@ -778,6 +851,9 @@
                 const path = document.getElementById('newPath').value.trim();
                 const target = document.getElementById('newTarget').value.trim();
                 const expiry = document.getElementById('newExpiry').value;
+                const enabled = document.getElementById('newEnabled').checked;
+                const isWechat = document.getElementById('newIsWechat').checked;
+                const qrCodeData = document.getElementById('qrCodeData').value;
 
                 // 输入验证
                 if (!name) {
@@ -796,12 +872,24 @@
                     showAlert('请输入目标 URL');
                     return;
                 }
+                if (isWechat && !qrCodeData) {
+                    showAlert('请先上传微信群二维码');
+                    return;
+                }
 
                 try {
                     const response = await fetch('/api/mapping', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, path, target, expiry })
+                        body: JSON.stringify({ 
+                            name, 
+                            path, 
+                            target, 
+                            expiry,
+                            enabled,
+                            isWechat,
+                            qrCodeData: isWechat ? qrCodeData : null
+                        })
                     });
 
                     if (response.status === 401) {
@@ -973,6 +1061,18 @@
                     row.appendChild(cell);
                 });
 
+                // 添加状态列
+                const statusCell = document.createElement('td');
+                statusCell.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="badge ${mapping.enabled ? 'badge-success' : 'badge-error'}">
+                            ${mapping.enabled ? '启用' : '禁用'}
+                        </span>
+                        ${mapping.isWechat ? '<span class="badge badge-info">微信</span>' : ''}
+                    </div>
+                `;
+                row.appendChild(statusCell);
+
                 const actionsCell = document.createElement('td');
                 actionsCell.innerHTML = `
                     <div class="join">
@@ -1002,14 +1102,36 @@
                 const originalPath = cells[1].dataset.original;
 
                 if (isEditing) {
-                    // 切换到编辑模式
-                    cells[0].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[0].dataset.original}">`;
-                    cells[1].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[1].dataset.original}">`;
-                    cells[2].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${cells[2].dataset.original}">`;
-                    cells[3].innerHTML = `<input type="date" class="input input-bordered input-sm w-full" value="${cells[3].dataset.original}">`;
+                    // 获取当前行的数据
+                    const currentData = {
+                        name: cells[0].dataset.original,
+                        path: cells[1].dataset.original,
+                        target: cells[2].dataset.original,
+                        expiry: cells[3].dataset.original,
+                        enabled: cells[4].querySelector('.badge-success') !== null,
+                        isWechat: cells[4].querySelector('.badge-info') !== null
+                    };
 
-                    // 修改按钮组，将删除按钮改为取消按钮
-                    const actionsCell = cells[4];
+                    // 切换到编辑模式
+                    cells[0].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.name}">`;
+                    cells[1].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.path}">`;
+                    cells[2].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.target}">`;
+                    cells[3].innerHTML = `<input type="date" class="input input-bordered input-sm w-full" value="${currentData.expiry}">`;
+                    cells[4].innerHTML = `
+                        <div class="flex flex-col gap-2">
+                            <label class="cursor-pointer label justify-start gap-2">
+                                <input type="checkbox" class="toggle toggle-primary toggle-sm" ${currentData.enabled ? 'checked' : ''}>
+                                <span class="label-text">启用</span>
+                            </label>
+                            <label class="cursor-pointer label justify-start gap-2">
+                                <input type="checkbox" class="toggle toggle-primary toggle-sm" ${currentData.isWechat ? 'checked' : ''}>
+                                <span class="label-text">微信</span>
+                            </label>
+                        </div>
+                    `;
+
+                    // 修改按钮组
+                    const actionsCell = cells[5];
                     actionsCell.innerHTML = `
                         <div class="join">
                             <button class="join-item btn btn-success btn-sm">保存</button>
@@ -1020,38 +1142,67 @@
 
                     // 重新绑定事件监听器
                     const [saveBtn, cancelBtn, qrBtn] = actionsCell.querySelectorAll('button');
-                    saveBtn.onclick = () => toggleEditMode(row);
-                    cancelBtn.onclick = () => restoreRow(row); // 直接调用 restoreRow 取消编辑
+                    saveBtn.onclick = () => saveEdit(row);
+                    cancelBtn.onclick = () => restoreRow(row);
                     qrBtn.onclick = () => generateQRForMapping(window.location.origin + '/' + cells[1].dataset.original, cells[1].dataset.original);
-                } else {
-                    // 获取新值
-                    const newName = cells[0].querySelector('input').value;
-                    const newPath = cells[1].querySelector('input').value;
-                    const newTarget = cells[2].querySelector('input').value;
-                    const newExpiry = cells[3].querySelector('input').value;
+                }
+            }
 
-                    // 检查是否有任何修改
-                    const hasChanges =
-                        newName !== cells[0].dataset.original ||
-                        newPath !== cells[1].dataset.original ||
-                        newTarget !== cells[2].dataset.original ||
-                        newExpiry !== cells[3].dataset.original;
+            async function saveEdit(row) {
+                const cells = row.cells;
+                const originalPath = cells[1].dataset.original;
 
-                    if (!hasChanges) {
-                        // 如果没有修改，直接恢复显示
-                        restoreRow(row);
+                const newName = cells[0].querySelector('input').value;
+                const newPath = cells[1].querySelector('input').value;
+                const newTarget = cells[2].querySelector('input').value;
+                const newExpiry = cells[3].querySelector('input').value;
+                const [enabledToggle, isWechatToggle] = cells[4].querySelectorAll('input[type="checkbox"]');
+                const newEnabled = enabledToggle.checked;
+                const newIsWechat = isWechatToggle.checked;
+
+                // 检查是否有任何修改
+                const hasChanges =
+                    newName !== cells[0].dataset.original ||
+                    newPath !== cells[1].dataset.original ||
+                    newTarget !== cells[2].dataset.original ||
+                    newExpiry !== cells[3].dataset.original ||
+                    newEnabled !== (cells[4].querySelector('.badge-success') !== null) ||
+                    newIsWechat !== (cells[4].querySelector('.badge-info') !== null);
+
+                if (!hasChanges) {
+                    restoreRow(row);
+                    return;
+                }
+
+                // 保存更改
+                const newMapping = {
+                    name: newName,
+                    path: newPath,
+                    target: newTarget,
+                    expiry: newExpiry,
+                    enabled: newEnabled,
+                    isWechat: newIsWechat,
+                    originalPath: originalPath
+                };
+
+                try {
+                    const response = await fetch('/api/mapping', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newMapping)
+                    });
+
+                    if (!response.ok) {
+                        const data = await response.json();
+                        showAlert(data.message || data.error || '更新失败，请重试');
                         return;
                     }
 
-                    // 保存更改
-                    const newMapping = {
-                        name: newName,
-                        path: newPath,
-                        target: newTarget,
-                        expiry: newExpiry,
-                        originalPath: originalPath
-                    };
-                    updateMapping(newMapping);
+                    showAlert('更新成功', 'success');
+                    location.reload();
+                } catch (error) {
+                    console.error('更新失败:', error);
+                    showAlert('更新失败，请检查网络连接后重试');
                 }
             }
 
@@ -1062,8 +1213,20 @@
                 cells[2].textContent = cells[2].dataset.original;
                 cells[3].textContent = cells[3].dataset.original || '永久有效';
 
-                // 恢复按钮组，保持 join 样式
-                const actionsCell = cells[4];
+                // 恢复状态列
+                const isEnabled = cells[4].querySelector('.badge-success') !== null;
+                const isWechat = cells[4].querySelector('.badge-info') !== null;
+                cells[4].innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="badge ${isEnabled ? 'badge-success' : 'badge-error'}">
+                            ${isEnabled ? '启用' : '禁用'}
+                        </span>
+                        ${isWechat ? '<span class="badge badge-info">微信</span>' : ''}
+                    </div>
+                `;
+
+                // 恢复按钮组
+                const actionsCell = cells[5];
                 actionsCell.innerHTML = `
                     <div class="join">
                         <button class="join-item btn btn-warning btn-sm">编辑</button>

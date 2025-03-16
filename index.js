@@ -35,7 +35,7 @@ function clearAuthCookie() {
 async function listMappings(page = 1, pageSize = 10) {
   const TOTAL_COUNT_KEY = "__total_count";
   let count;
-  
+
   try {
     count = await KV_BINDING.get(TOTAL_COUNT_KEY, { type: "json" });
   } catch (e) {
@@ -45,14 +45,14 @@ async function listMappings(page = 1, pageSize = 10) {
   const mappings = {};
   const skip = (page - 1) * pageSize;
   let validCount = 0;  // 用于记录有效的映射数量
-  
+
   if (page === 1 || skip < 100) {
     let cursor = null;
     let processedCount = 0;
 
     do {
       const listResult = await KV_BINDING.list({ cursor, limit: Math.min(1000, skip + pageSize) });
-      
+
       for (const key of listResult.keys) {
         // 跳过 banPath 中的路径
         if (!banPath.includes(key.name)) {
@@ -63,7 +63,7 @@ async function listMappings(page = 1, pageSize = 10) {
           processedCount++;
         }
       }
-      
+
       cursor = listResult.cursor;
       if (count === null && cursor) {
         const remaining = await KV_BINDING.list({ cursor, limit: 1000 });
@@ -72,7 +72,7 @@ async function listMappings(page = 1, pageSize = 10) {
         cursor = remaining.cursor;
       }
     } while (cursor && Object.keys(mappings).length < pageSize);
-    
+
     if (count === null) {
       count = processedCount;
       await KV_BINDING.put(TOTAL_COUNT_KEY, JSON.stringify(count));
@@ -82,14 +82,14 @@ async function listMappings(page = 1, pageSize = 10) {
     const batchSize = 1000;
     let validSkip = skip;
     let processedValid = 0;
-    
+
     // 继续获取数据直到找到足够的有效记录
     while (processedValid < validSkip + pageSize) {
       const listResult = await KV_BINDING.list({ cursor, limit: batchSize });
-      
+
       // 过滤掉 banPath 中的路径
       const validKeys = listResult.keys.filter(key => !banPath.includes(key.name));
-      
+
       // 如果已经跳过了足够的记录，开始收集数据
       if (processedValid + validKeys.length > validSkip) {
         const startIndex = validSkip - processedValid;
@@ -98,10 +98,10 @@ async function listMappings(page = 1, pageSize = 10) {
           mappings[validKeys[i].name] = value;
         }
       }
-      
+
       processedValid += validKeys.length;
       cursor = listResult.cursor;
-      
+
       if (!cursor) break;
     }
   }
@@ -115,7 +115,7 @@ async function listMappings(page = 1, pageSize = 10) {
   };
 }
 
-async function createMapping(path, target, name, expiry) {
+async function createMapping(path, target, name, expiry, enabled = true, isWechat = false, qrCodeData = null) {
   if (!path || !target || typeof path !== 'string' || typeof target !== 'string') {
     throw new Error('Invalid input');
   }
@@ -129,10 +129,18 @@ async function createMapping(path, target, name, expiry) {
     throw new Error('Invalid expiry date');
   }
 
+  // 如果是微信二维码，必须提供二维码数据
+  if (isWechat && !qrCodeData) {
+    throw new Error('微信二维码必须提供原始二维码数据');
+  }
+
   const mapping = {
     target,
     name: name || null,
-    expiry: expiry || null
+    expiry: expiry || null,
+    enabled: enabled,
+    isWechat: isWechat,
+    qrCodeData: qrCodeData
   };
 
   await KV_BINDING.put(path, JSON.stringify(mapping));
@@ -153,7 +161,7 @@ async function deleteMapping(path) {
   await updateTotalCount(-1);
 }
 
-async function updateMapping(originalPath, newPath, target, name, expiry) {
+async function updateMapping(originalPath, newPath, target, name, expiry, enabled = true, isWechat = false, qrCodeData = null) {
   if (!originalPath || !newPath || !target) {
     throw new Error('Invalid input');
   }
@@ -167,6 +175,11 @@ async function updateMapping(originalPath, newPath, target, name, expiry) {
     throw new Error('Invalid expiry date');
   }
 
+  // 如果是微信二维码，必须提供二维码数据
+  if (isWechat && !qrCodeData) {
+    throw new Error('微信二维码必须提供原始二维码数据');
+  }
+
   if (originalPath !== newPath) {
     await KV_BINDING.delete(originalPath);
   }
@@ -174,7 +187,10 @@ async function updateMapping(originalPath, newPath, target, name, expiry) {
   const mapping = {
     target,
     name: name || null,
-    expiry: expiry || null
+    expiry: expiry || null,
+    enabled: enabled,
+    isWechat: isWechat,
+    qrCodeData: qrCodeData
   };
 
   await KV_BINDING.put(newPath, JSON.stringify(mapping));
@@ -293,7 +309,7 @@ export default {
           // 创建映射
           if (request.method === 'POST') {
             const data = await request.json();
-            await createMapping(data.path, data.target, data.name, data.expiry);
+            await createMapping(data.path, data.target, data.name, data.expiry, data.enabled, data.isWechat, data.qrCodeData);
             return new Response(JSON.stringify({ success: true }), {
               headers: { 'Content-Type': 'application/json' }
             });
@@ -307,7 +323,10 @@ export default {
               data.path,
               data.target,
               data.name,
-              data.expiry
+              data.expiry,
+              data.enabled,
+              data.isWechat,
+              data.qrCodeData
             );
             return new Response(JSON.stringify({ success: true }), {
               headers: { 'Content-Type': 'application/json' }
@@ -337,20 +356,99 @@ export default {
     }
 
     // URL 重定向处理
-    try {
-      const mapping = await KV_BINDING.get(path, { type: "json" });
-      if (mapping) {
-        // 检查是否过期
-        if (mapping.expiry && new Date(mapping.expiry) < new Date()) {
-          await KV_BINDING.delete(path);
-          return new Response('Not Found', { status: 404 });
+    if (path) {
+      try {
+        const mapping = await KV_BINDING.get(path, { type: "json" });
+        if (mapping) {
+          // 检查是否启用
+          if (!mapping.enabled) {
+            return new Response('Not Found', { status: 404 });
+          }
+
+          // 检查是否过期
+          if (mapping.expiry && new Date(mapping.expiry) < new Date()) {
+            await KV_BINDING.delete(path);
+            return new Response('Not Found', { status: 404 });
+          }
+
+          // 如果是微信二维码，返回活码页面
+          if (mapping.isWechat && mapping.qrCodeData) {
+            const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信群二维码</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f2f5;
         }
-        return Response.redirect(mapping.target, 302);
+        .container {
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .qr-code {
+            max-width: 280px;
+            width: 100%;
+            height: auto;
+            margin: 20px auto;
+        }
+        .title {
+            color: #333;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        .description {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .notice {
+            color: #999;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">微信群二维码</h1>
+        <p class="description">请长按下方二维码图片，选择"识别图中二维码"来加入群聊</p>
+        <img class="qr-code" src="${mapping.qrCodeData}" alt="微信群二维码">
+        <p class="notice">如果二维码失效，请联系群主更新</p>
+    </div>
+</body>
+</html>`;
+            return new Response(html, {
+              headers: {
+                'Content-Type': 'text/html;charset=UTF-8',
+                'Cache-Control': 'no-store'
+              }
+            });
+          }
+
+          // 如果不是微信二维码，执行普通重定向
+          return Response.redirect(mapping.target, 302);
+        }
+        return new Response('Not Found', { status: 404 });
+      } catch (error) {
+        console.error('Redirect error:', error);
+        return new Response('Internal Server Error', { status: 500 });
       }
-      return new Response('Not Found', { status: 404 });
-    } catch (error) {
-      console.error('Redirect error:', error);
-      return new Response('Internal Server Error', { status: 500 });
     }
   },
 
