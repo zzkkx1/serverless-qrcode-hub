@@ -1096,7 +1096,7 @@
             }
 
             // 添加切换编辑模式的函数
-            function toggleEditMode(row) {
+            async function toggleEditMode(row) {
                 const isEditing = row.classList.toggle('editing');
                 const cells = row.cells;
                 const originalPath = cells[1].dataset.original;
@@ -1112,6 +1112,18 @@
                         isWechat: cells[4].querySelector('.badge-info') !== null
                     };
 
+                    // 获取原始映射数据，检查是否有二维码数据
+                    let hasQRCodeData = false;
+                    try {
+                        const response = await fetch(`/api/mapping?path=${originalPath}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            hasQRCodeData = !!data.qrCodeData;
+                        }
+                    } catch (error) {
+                        console.error('获取映射数据失败:', error);
+                    }
+
                     // 切换到编辑模式
                     cells[0].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.name}">`;
                     cells[1].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.path}">`;
@@ -1123,10 +1135,12 @@
                                 <input type="checkbox" class="toggle toggle-primary toggle-sm" ${currentData.enabled ? 'checked' : ''}>
                                 <span class="label-text">启用</span>
                             </label>
+                            ${hasQRCodeData ? `
                             <label class="cursor-pointer label justify-start gap-2">
                                 <input type="checkbox" class="toggle toggle-primary toggle-sm" ${currentData.isWechat ? 'checked' : ''}>
                                 <span class="label-text">微信</span>
                             </label>
+                            ` : ''}
                         </div>
                     `;
 
@@ -1156,9 +1170,10 @@
                 const newPath = cells[1].querySelector('input').value;
                 const newTarget = cells[2].querySelector('input').value;
                 const newExpiry = cells[3].querySelector('input').value;
-                const [enabledToggle, isWechatToggle] = cells[4].querySelectorAll('input[type="checkbox"]');
+                const enabledToggle = cells[4].querySelector('input[type="checkbox"]');
+                const isWechatToggle = cells[4].querySelectorAll('input[type="checkbox"]')[1];
                 const newEnabled = enabledToggle.checked;
-                const newIsWechat = isWechatToggle.checked;
+                const newIsWechat = isWechatToggle ? isWechatToggle.checked : false;
 
                 // 检查是否有任何修改
                 const hasChanges =
@@ -1167,7 +1182,7 @@
                     newTarget !== cells[2].dataset.original ||
                     newExpiry !== cells[3].dataset.original ||
                     newEnabled !== (cells[4].querySelector('.badge-success') !== null) ||
-                    newIsWechat !== (cells[4].querySelector('.badge-info') !== null);
+                    (isWechatToggle && newIsWechat !== (cells[4].querySelector('.badge-info') !== null));
 
                 if (!hasChanges) {
                     restoreRow(row);
@@ -1175,14 +1190,12 @@
                 }
 
                 try {
-                    // 如果是微信二维码，先获取原有数据
+                    // 获取原有数据
+                    const response = await fetch(`/api/mapping?path=${originalPath}`);
                     let qrCodeData = null;
-                    if (newIsWechat) {
-                        const response = await fetch(`/api/mapping?path=${originalPath}`);
-                        if (response.ok) {
-                            const data = await response.json();
-                            qrCodeData = data.qrCodeData;
-                        }
+                    if (response.ok) {
+                        const data = await response.json();
+                        qrCodeData = data.qrCodeData;
                     }
 
                     // 保存更改
@@ -1192,19 +1205,19 @@
                         target: newTarget,
                         expiry: newExpiry,
                         enabled: newEnabled,
-                        isWechat: newIsWechat,
+                        isWechat: newIsWechat && !!qrCodeData, // 只有在有二维码数据时才能启用微信二维码
                         qrCodeData: qrCodeData,
                         originalPath: originalPath
                     };
 
-                    const response = await fetch('/api/mapping', {
+                    const updateResponse = await fetch('/api/mapping', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(newMapping)
                     });
 
-                    if (!response.ok) {
-                        const data = await response.json();
+                    if (!updateResponse.ok) {
+                        const data = await updateResponse.json();
                         showAlert(data.message || data.error || '更新失败，请重试');
                         return;
                     }
