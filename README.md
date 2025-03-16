@@ -25,7 +25,7 @@
 ## 使用步骤
 
 - Fork 仓库
-- 在 cloudflare 控制台创建 KV 命名空间并复制 KV 命名空间 ID
+- 在 Cloudflare 控制台创建 KV 命名空间并复制 KV 命名空间 ID
 - 在 GitHub 打开仓库的 `wrangler.toml` 文件，将 `kv_namespaces` 下的 `id` 内容替换为你的 KV 命名空间 ID
 
 ```toml
@@ -42,6 +42,7 @@ kv_namespaces = [
 ### 参考截图
 
 **下面的截图是旧版的，仅供参考，和现在的方式不一样，参考上面的使用步骤**
+
 **步骤不需要和我这个完全一致，只要能部署成功就行。我这里有一些错误，请忽略。**
 
 1. Fork 本项目
