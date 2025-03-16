@@ -485,7 +485,7 @@ export default {
         <h1 class="title">${mapping.name ? mapping.name : '微信二维码'}</h1>
         <p class="notice">请长按识别下方二维码</p>
         <img class="qr-code" src="${mapping.qrCodeData}" alt="微信群二维码">
-        <p class="footer">二维码失效请联系群主更新</p>
+        <p class="footer">二维码失效请联系作者更新</p>
     </div>
 </body>
 </html>`;
