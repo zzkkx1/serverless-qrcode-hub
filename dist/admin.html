@@ -937,7 +937,22 @@
                             }
 
                             showAlert('删除成功', 'success');
-                            location.reload();
+                            
+                            // 不再刷新整个页面，而是重新加载表格数据
+                            await loadMappings();
+                            
+                            // 如果当前在过期或即将过期的视图中，重新加载相应的数据
+                            const expiringBtn = document.getElementById('showExpiringBtn');
+                            const expiredBtn = document.getElementById('showExpiredBtn');
+                            
+                            if (expiringBtn.classList.contains('btn-warning')) {
+                                await loadExpiringMappings('expiring');
+                            } else if (expiredBtn.classList.contains('btn-error')) {
+                                await loadExpiringMappings('expired');
+                            }
+
+                            // 关闭模态框
+                            modal.close();
                         } catch (error) {
                             console.error('删除失败:', error);
                             showAlert('删除失败，请检查网络连接后重试');
@@ -1205,7 +1220,7 @@
                         target: newTarget,
                         expiry: newExpiry,
                         enabled: newEnabled,
-                        isWechat: newIsWechat && !!qrCodeData, // 只有在有二维码数据时才能启用微信二维码
+                        isWechat: newIsWechat && !!qrCodeData,
                         qrCodeData: qrCodeData,
                         originalPath: originalPath
                     };
@@ -1223,7 +1238,19 @@
                     }
 
                     showAlert('更新成功', 'success');
-                    location.reload();
+                    
+                    // 不再刷新整个页面，而是重新加载表格数据
+                    await loadMappings();
+                    
+                    // 如果当前在过期或即将过期的视图中，重新加载相应的数据
+                    const expiringBtn = document.getElementById('showExpiringBtn');
+                    const expiredBtn = document.getElementById('showExpiredBtn');
+                    
+                    if (expiringBtn.classList.contains('btn-warning')) {
+                        await loadExpiringMappings('expiring');
+                    } else if (expiredBtn.classList.contains('btn-error')) {
+                        await loadExpiringMappings('expired');
+                    }
                 } catch (error) {
                     console.error('更新失败:', error);
                     showAlert('更新失败，请检查网络连接后重试');
