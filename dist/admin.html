@@ -716,6 +716,12 @@
                             // 启用微信二维码开关
                             const wechatToggle = document.getElementById('newIsWechat');
                             wechatToggle.disabled = false;
+                            // 如果是微信链接，自动启用微信二维码开关
+                            if (decodedText.startsWith('https://weixin.qq.com/')) {
+                                wechatToggle.checked = true;
+                                // 设置目标URL为只读
+                                document.getElementById('newTarget').readOnly = true;
+                            }
                             showAlert('二维码识别成功', 'success');
                         }
                     } catch (decodeError) {
@@ -749,6 +755,12 @@
                                 // 启用微信二维码开关
                                 const wechatToggle = document.getElementById('newIsWechat');
                                 wechatToggle.disabled = false;
+                                // 如果是微信链接，自动启用微信二维码开关
+                                if (decodedText.startsWith('https://weixin.qq.com/')) {
+                                    wechatToggle.checked = true;
+                                    // 设置目标URL为只读
+                                    document.getElementById('newTarget').readOnly = true;
+                                }
                                 showAlert('二维码识别成功', 'success');
                             }
                         } catch (finalError) {

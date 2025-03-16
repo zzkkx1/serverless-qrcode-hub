@@ -397,52 +397,99 @@ export default {
 
           // 如果是微信二维码，返回活码页面
           if (mapping.isWechat && mapping.qrCodeData) {
-            const html = `<!DOCTYPE html>
+            const wechatHtml = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>微信群二维码</title>
+    <title>${mapping.name || '微信群二维码'}</title>
     <style>
+        :root {
+            color-scheme: light dark;
+        }
         body {
             margin: 0;
-            padding: 0;
+            padding: 16px;
             min-height: 100vh;
             display: flex;
-            font-family: system-ui, -apple-system, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f7f7f7;
+            box-sizing: border-box;
         }
         .container {
             margin: auto;
-            width: 100%;
-            border-radius: 0;
+            padding: 24px 16px;
+            width: calc(100% - 32px);
+            max-width: 320px;
+            text-align: center;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .wechat-icon {
+            width: 32px;
+            height: 32px;
+            margin-bottom: 12px;
         }
         .title {
-            font-size: 18px;
-            margin: 0 0 12px;
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0 0 8px;
             color: #333;
         }
         .qr-code {
             width: 100%;
             max-width: 240px;
-            margin: 16px 0;
+            border-radius: 8px;
+            margin: 20px 0;
         }
         .notice {
-            font-size: 14px;
+            font-size: 16px;
             color: #666;
-            margin: 0;
+            margin: 16px 0 0;
+            line-height: 1.5;
+        }
+        .footer {
+            font-size: 14px;
+            color: #999;
+            margin-top: 20px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #1a1a1a;
+            }
+            .container {
+                background: #2a2a2a;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+            .title {
+                color: #e0e0e0;
+            }
+            .notice {
+                color: #aaa;
+            }
+            .footer {
+                color: #777;
+            }
+            .qr-code {
+                background: white;
+                padding: 8px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="title">微信群二维码</h1>
-        <p class="notice">请长按下方二维码图片<br>选择"前往图中包含的群聊"来加入群聊</p>
+        <img class="wechat-icon" src="wechat.svg" alt="WeChat">
+        <h1 class="title">${mapping.name ? mapping.name : '微信二维码'}</h1>
+        <p class="notice">请长按识别下方二维码</p>
         <img class="qr-code" src="${mapping.qrCodeData}" alt="微信群二维码">
-        <p class="notice">二维码失效请联系群主</p>
+        <p class="footer">二维码失效请联系群主更新</p>
     </div>
 </body>
 </html>`;
-            return new Response(html, {
+            return new Response(wechatHtml, {
               headers: {
                 'Content-Type': 'text/html;charset=UTF-8',
                 'Cache-Control': 'no-store'
