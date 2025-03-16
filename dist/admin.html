@@ -311,7 +311,7 @@
                             <label class="label cursor-pointer justify-start gap-2">
                                 <input type="checkbox" id="newIsWechat" class="toggle toggle-primary">
                                 <span class="label-text">微信二维码</span>
-                                <div class="tooltip tooltip-right" data-tip="如果是微信群二维码，将使用活码页面展示原二维码">
+                                <div class="tooltip tooltip-right" data-tip="如果是微信群二维码，将使用活码页面展示原二维码。当上传了二维码图片时，本开关可以被开启或关闭">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                         class="w-4 h-4 stroke-current">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -556,6 +556,26 @@
                     updateFilterButtonStates('showExpiredBtn');
                     loadExpiringMappings('expired');
                 });
+
+                // 添加微信二维码开关事件监听
+                document.getElementById('newIsWechat').addEventListener('change', function(e) {
+                    const targetInput = document.getElementById('newTarget');
+                    const decodedText = document.getElementById('decoded-text').textContent;
+                    
+                    if (e.target.checked) {
+                        // 如果启用微信二维码，设置为只读并使用二维码识别的内容
+                        targetInput.readOnly = true;
+                        if (decodedText) {
+                            targetInput.value = decodedText;
+                        }
+                    } else {
+                        // 如果禁用微信二维码，恢复可编辑状态
+                        targetInput.readOnly = false;
+                    }
+                });
+                
+                // 初始禁用微信二维码开关
+                document.getElementById('newIsWechat').disabled = true;
             }
 
             // 添加全局错误处理
@@ -610,6 +630,13 @@
                 document.getElementById('qr-result').classList.add('hidden');
                 document.getElementById('decoded-text').textContent = '';
                 document.getElementById('newTarget').value = '';
+                
+                // 重置并禁用微信二维码开关
+                const wechatToggle = document.getElementById('newIsWechat');
+                wechatToggle.checked = false;
+                wechatToggle.disabled = true;
+                // 恢复目标URL输入框的可编辑状态
+                document.getElementById('newTarget').readOnly = false;
 
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -686,6 +713,9 @@
 
                             // 自动填充到目标 URL 输入框
                             document.getElementById('newTarget').value = decodedText;
+                            // 启用微信二维码开关
+                            const wechatToggle = document.getElementById('newIsWechat');
+                            wechatToggle.disabled = false;
                             showAlert('二维码识别成功', 'success');
                         }
                     } catch (decodeError) {
@@ -716,6 +746,9 @@
                                 document.getElementById('decoded-text').textContent = decodedText;
                                 document.getElementById('qr-result').classList.remove('hidden');
                                 document.getElementById('newTarget').value = decodedText;
+                                // 启用微信二维码开关
+                                const wechatToggle = document.getElementById('newIsWechat');
+                                wechatToggle.disabled = false;
                                 showAlert('二维码识别成功', 'success');
                             }
                         } catch (finalError) {
