@@ -373,8 +373,7 @@ export default {
 
           // 如果是微信二维码，返回活码页面
           if (mapping.isWechat && mapping.qrCodeData) {
-            const html = `
-<!DOCTYPE html>
+            const html = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -383,53 +382,39 @@ export default {
     <style>
         body {
             margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            padding: 0;
             min-height: 100vh;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f0f2f5;
+            display: flex;
+            font-family: system-ui, -apple-system, sans-serif;
         }
         .container {
-            max-width: 500px;
+            margin: auto;
             width: 100%;
-            text-align: center;
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .qr-code {
-            max-width: 280px;
-            width: 100%;
-            height: auto;
-            margin: 20px auto;
+            border-radius: 0;
         }
         .title {
+            font-size: 18px;
+            margin: 0 0 12px;
             color: #333;
-            font-size: 1.5em;
-            margin-bottom: 15px;
         }
-        .description {
-            color: #666;
-            margin-bottom: 20px;
-            line-height: 1.5;
+        .qr-code {
+            width: 100%;
+            max-width: 240px;
+            margin: 16px 0;
         }
         .notice {
-            color: #999;
-            font-size: 0.9em;
-            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+            margin: 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1 class="title">微信群二维码</h1>
-        <p class="description">请长按下方二维码图片，选择"识别图中二维码"来加入群聊</p>
+        <p class="notice">请长按下方二维码图片<br>选择"前往图中包含的群聊"来加入群聊</p>
         <img class="qr-code" src="${mapping.qrCodeData}" alt="微信群二维码">
-        <p class="notice">如果二维码失效，请联系群主更新</p>
+        <p class="notice">二维码失效请联系群主</p>
     </div>
 </body>
 </html>`;
