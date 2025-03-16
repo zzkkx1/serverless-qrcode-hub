@@ -1174,18 +1174,29 @@
                     return;
                 }
 
-                // 保存更改
-                const newMapping = {
-                    name: newName,
-                    path: newPath,
-                    target: newTarget,
-                    expiry: newExpiry,
-                    enabled: newEnabled,
-                    isWechat: newIsWechat,
-                    originalPath: originalPath
-                };
-
                 try {
+                    // 如果是微信二维码，先获取原有数据
+                    let qrCodeData = null;
+                    if (newIsWechat) {
+                        const response = await fetch(`/api/mapping?path=${originalPath}`);
+                        if (response.ok) {
+                            const data = await response.json();
+                            qrCodeData = data.qrCodeData;
+                        }
+                    }
+
+                    // 保存更改
+                    const newMapping = {
+                        name: newName,
+                        path: newPath,
+                        target: newTarget,
+                        expiry: newExpiry,
+                        enabled: newEnabled,
+                        isWechat: newIsWechat,
+                        qrCodeData: qrCodeData,
+                        originalPath: originalPath
+                    };
+
                     const response = await fetch('/api/mapping', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },

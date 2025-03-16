@@ -306,6 +306,30 @@ export default {
 
         // 映射管理 API
         if (path === 'api/mapping') {
+          // 获取单个映射
+          if (request.method === 'GET') {
+            const params = new URLSearchParams(url.search);
+            const mappingPath = params.get('path');
+            if (!mappingPath) {
+              return new Response(JSON.stringify({ error: 'Missing path parameter' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+
+            const mapping = await KV_BINDING.get(mappingPath, { type: "json" });
+            if (!mapping) {
+              return new Response(JSON.stringify({ error: 'Mapping not found' }), {
+                status: 404,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+
+            return new Response(JSON.stringify(mapping), {
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+
           // 创建映射
           if (request.method === 'POST') {
             const data = await request.json();
