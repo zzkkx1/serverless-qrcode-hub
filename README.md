@@ -14,68 +14,82 @@
 ## 预览图
 
 - 登录
+
   ![preview-login](./images/preview-login.png)
+
 - 管理后台1：添加普通短链
+
   ![preview-admin](./images/preview-admin.png)
+
 - 管理后台2：添加微信二维码
+
   ![preview-admin2](./images/preview-admin2.png)
+
 - 管理后台3
+
   ![preview-admin3](./images/preview-admin3.png)
+
 - 生成二维码
+
   ![preview-qr](./images/preview-qr.png)
+
 - 管理后台4：编辑
+
   ![preview-admin4](./images/preview-admin4.png)
+
 - 微信识别
+
   ![preview-wechat](./images/preview-wechat.jpg)
+  
 - 短链跳转就不展示了，是直接跳转的
 
 ## 使用步骤
 
-- Fork 仓库
-- 在 Cloudflare 控制台创建 KV 命名空间并复制 KV 命名空间 ID
-- 在 GitHub 打开仓库的 `wrangler.toml` 文件，将 `kv_namespaces` 下的 `id` 内容替换为你的 KV 命名空间 ID
+1. 登录 Cloudflare 并创建 KV 命名空间
 
-```toml
-kv_namespaces = [
-    # 注意：将下面的 id 替换为你自己拷贝的 KV 命名空间 id 才能正常使用！
-    { binding = "KV_BINDING", id = "1861b1f17ac346e9aca647e7d4a4c143" },
-]
-```
+   ![](./images/1.jpg)
 
-- 创建 Worker，选择你 Fork 并修改的项目，设置`变量和机密`-`密钥`类型的变量，名称为 `PASSWORD`，值为英文大小写字母和数字，尽量长点复杂点，建议使用小写的 uuid 字符串
-- 创建成功后绑定自定义域名
-- 部署成功后，访问 https://{你的域名}/ 登录，然后自动跳转到 https://{你的域名}/admin 管理后台，下次可以直接打开不需要再登录，但还是建议保存好密码
+2. 复制 KV 命名空间 ID
 
-### 参考截图
+   ![](./images/2.jpg)
 
-**下面的截图是旧版的，仅供参考，和现在的方式不一样，参考上面的使用步骤**
+3. 回到 GitHub 并 Fork 仓库
 
-**步骤不需要和我这个完全一致，只要能部署成功就行。我这里有一些错误，请忽略。**
+   ![](./images/3.png)
 
-1. Fork 本项目
-   ![fork](./images/fork.png)
-2. 创建 KV 命名空间
-   ![create kv](./images/create-kv.png)
-3. 创建 Worker
-   ![create worker](./images/create-worker.png)
-4. 选择你 Fork 的项目
-   ![select fork](./images/create-worker2.png)
-5. 修改构建配置
-   ![build config](./images/create-worker3.png)
-6. 绑定 KV 命名空间 KV_BINDING
-   ![bind kv](./images/bind-kv.png)
-7. 点击保存版本
-   ![save](./images/save.png)
-8. 创建环境变量 PASSWORD，注意格式是英文大小写字母、数字或者符号，尽量搞复杂点
-   ![create env](./images/create-env.png)
-9. 点击保存版本
-   ![save](./images/save.png)
-10. 最终效果
-    ![final](./images/final.png)
-11. 回到部署页，点击 `您的上一次构建失败。查看构建` 然后点击 `重试构建`
-12. 部署成功
-13. 绑定自定义域名
-    ![bind domain](./images/domain.png)
+4. 在 GitHub 打开你 Fork 的仓库的 `wrangler.toml` 文件，点击图中的按钮编辑
+
+   ![](./images/4.jpg)
+
+5. 将 `kv_namespaces` 下的 `id` 内容替换为你的 KV 命名空间 ID
+
+   ![](./images/5.jpg)
+
+6. 回到 Cloudflare 并创建 Worker
+
+   ![](./images/6.jpg)
+
+7. 选择你 Fork 的 Github 仓库
+
+   ![](./images/7.jpg)
+
+8. 按图中过程创建后台登录密码 `PASSWORD`，注意格式是英文大小写字母、数字，尽量长点复杂点，建议使用小写的 uuid 字符串
+
+   ![](./images/8.jpg)
+
+9. 等待部署成功，自动跳转到了这个页面，此时已经可以用了，默认分配的 `*.workers.dev` 域名在国内访问较慢，建议绑定自己的域名
+
+   ![](./images/9.jpg)
+
+10. 绑定自定义域名
+
+   ![](./images/10.jpg)
+
+11. 设置一个你在 GitHub 托管的域名的子域名 
+
+   ![](./images/11.jpg)
+
+12. 部署成功，此时已经可以通过默认分配的 `*.workers.dev` 或者你自定义的域名访问了！
 
 ## TODO
 
