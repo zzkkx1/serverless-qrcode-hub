@@ -69,7 +69,7 @@
 
    ![](./images/6.jpg)
 
-7. 选择你 Fork 的 Github 仓库，然后直接点击保存并部署
+7. 选择你 Fork 的 Github 仓库，然后直接点击右下角的 `保存并部署`
 
    ![](./images/7.jpg)
 
