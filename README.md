@@ -85,7 +85,7 @@
 
    ![](./images/10.jpg)
 
-11. 设置一个你在 GitHub 托管的域名的子域名 
+11. 设置一个你在 Cloudflare 托管的域名的子域名 
 
    ![](./images/11.jpg)
 
