@@ -118,55 +118,118 @@
             .table-responsive {
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                position: relative;
+                margin: 0 -1rem; /* 抵消卡片内边距 */
+                padding: 0 1rem;
+                width: calc(100% + 2rem);
             }
 
-            /* 移动端下调整列宽 */
-            .table-responsive th,
-            .table-responsive td {
-                min-width: 120px; /* 确保最小宽度可读 */
-            }
-            
-            .table-responsive th:nth-child(3),
-            .table-responsive td:nth-child(3) {
-                min-width: 200px; /* 目标URL需要更多空间 */
+            /* 表格基础样式调整 */
+            .table-responsive table {
+                min-width: 800px; /* 确保在小屏幕上可以横向滚动 */
+                font-size: 0.875rem; /* 稍微减小字体大小 */
             }
 
-            /* 操作按钮组响应式处理 */
-            .btn-group-responsive {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 0.5rem;
-            }
-
-            .btn-group-responsive .btn {
-                flex: 1;
-                min-width: auto;
-                white-space: nowrap;
-            }
-
-            /* 模态框响应式处理 */
-            .modal-box {
-                max-width: 90vw;
-                padding: 1rem;
-            }
-
-            /* 表单响应式处理 */
-            .form-grid {
-                grid-template-columns: 1fr !important;
-                gap: 1rem !important;
-            }
-
-            /* 导航栏响应式处理 */
-            .navbar {
-                flex-wrap: wrap;
+            /* 调整单元格内边距 */
+            .table-responsive td,
+            .table-responsive th {
                 padding: 0.5rem;
+                white-space: normal;
+                line-height: 1.4;
             }
 
-            .navbar>div {
-                width: 100%;
-                justify-content: center;
-                margin: 0.5rem 0;
+            /* 优化各列宽度 */
+            .table-responsive th:nth-child(1), /* 条目名称 */
+            .table-responsive td:nth-child(1) {
+                min-width: 120px;
+                max-width: 150px;
             }
+
+            .table-responsive th:nth-child(2), /* 短链名 */
+            .table-responsive td:nth-child(2) {
+                min-width: 100px;
+                max-width: 120px;
+            }
+
+            .table-responsive th:nth-child(3), /* 目标URL */
+            .table-responsive td:nth-child(3) {
+                min-width: 200px;
+                max-width: 300px;
+            }
+
+            .table-responsive th:nth-child(4), /* 失效日期 */
+            .table-responsive td:nth-child(4) {
+                min-width: 100px;
+                max-width: 120px;
+            }
+
+            .table-responsive th:nth-child(5), /* 状态 */
+            .table-responsive td:nth-child(5) {
+                min-width: 100px;
+                max-width: 120px;
+            }
+
+            .table-responsive th:nth-child(6), /* 操作 */
+            .table-responsive td:nth-child(6) {
+                min-width: 150px;
+                position: sticky;
+                right: 0;
+                background: var(--b1);
+                box-shadow: -4px 0 6px -2px rgba(0, 0, 0, 0.1);
+            }
+
+            /* 编辑模式下的样式优化 */
+            .table-responsive tr.editing td {
+                padding: 0.75rem 0.5rem;
+            }
+
+            .table-responsive tr.editing input,
+            .table-responsive tr.editing textarea {
+                font-size: 0.875rem;
+                padding: 0.25rem 0.5rem;
+            }
+
+            /* 添加横向滚动提示 */
+            .table-responsive::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: 30px;
+                background: linear-gradient(to right, transparent, rgba(var(--b1), 0.1));
+                pointer-events: none;
+            }
+
+            /* 优化操作按钮组 */
+            .table-responsive .join {
+                flex-wrap: nowrap;
+                gap: 0.25rem;
+            }
+
+            .table-responsive .join .btn {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+        }
+
+        /* 添加滚动条样式美化 */
+        .table-responsive::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: rgba(var(--b2), 0.1);
+            border-radius: 3px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: rgba(var(--p), 0.2);
+            border-radius: 3px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: rgba(var(--p), 0.3);
         }
 
         /* 优化表格过渡效果 */
