@@ -57,16 +57,40 @@
         .table-responsive td, .table-responsive th {
             vertical-align: top;
             word-break: break-word;
+            padding: 0.75rem 0.5rem; /* 调整单元格内边距 */
         }
 
+        /* 调整各列宽度 */
+        .table-responsive th:nth-child(1), /* 条目名称 */
+        .table-responsive td:nth-child(1) {
+            width: 15%;
+        }
+
+        .table-responsive th:nth-child(2), /* 短链名 */
+        .table-responsive td:nth-child(2) {
+            width: 12%;
+        }
+
+        .table-responsive th:nth-child(3), /* 目标URL */
         .table-responsive td:nth-child(3) {
+            width: 28%;
             white-space: normal;
             overflow-wrap: break-word;
         }
 
-        /* 针对编辑状态的文本区域 */
-        .table-responsive textarea {
-            min-height: 80px;
+        .table-responsive th:nth-child(4), /* 失效日期 */
+        .table-responsive td:nth-child(4) {
+            width: 12%;
+        }
+
+        .table-responsive th:nth-child(5), /* 状态 */
+        .table-responsive td:nth-child(5) {
+            width: 13%;
+        }
+
+        .table-responsive th:nth-child(6), /* 操作 */
+        .table-responsive td:nth-child(6) {
+            width: 20%;
         }
 
         /* 编辑模式下的行样式 */
@@ -92,10 +116,19 @@
 
             /* 表格响应式处理 */
             .table-responsive {
-                display: block;
-                width: 100%;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+            }
+
+            /* 移动端下调整列宽 */
+            .table-responsive th,
+            .table-responsive td {
+                min-width: 120px; /* 确保最小宽度可读 */
+            }
+            
+            .table-responsive th:nth-child(3),
+            .table-responsive td:nth-child(3) {
+                min-width: 200px; /* 目标URL需要更多空间 */
             }
 
             /* 操作按钮组响应式处理 */
