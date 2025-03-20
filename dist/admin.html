@@ -48,6 +48,37 @@
             opacity: 0;
         }
 
+        /* 表格样式优化 */
+        .table-responsive table {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .table-responsive td, .table-responsive th {
+            vertical-align: top;
+            word-break: break-word;
+        }
+
+        .table-responsive td:nth-child(3) {
+            white-space: normal;
+            overflow-wrap: break-word;
+        }
+
+        /* 针对编辑状态的文本区域 */
+        .table-responsive textarea {
+            min-height: 80px;
+        }
+
+        /* 编辑模式下的行样式 */
+        .table-responsive tr.editing {
+            background-color: rgba(var(--p), 0.1);
+        }
+
+        .table-responsive tr.editing td {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+
         /* 移动端响应式样式 */
         @media (max-width: 768px) {
             body {
@@ -428,11 +459,11 @@
                 <table class="table table-zebra w-full">
                     <thead>
                         <tr>
-                            <th class="w-1/5">条目名称</th>
-                            <th class="w-1/5">短链名</th>
-                            <th class="w-1/5">目标 URL</th>
-                            <th class="w-1/5">失效日期</th>
-                            <th class="w-1/5">操作</th>
+                            <th class="w-[15%]">条目名称</th>
+                            <th class="w-[15%]">短链名</th>
+                            <th class="w-[30%]">目标 URL</th>
+                            <th class="w-[15%]">失效日期</th>
+                            <th class="w-[25%]">操作</th>
                         </tr>
                     </thead>
                     <tbody id="mappingsTableBody">
@@ -856,11 +887,14 @@
                     renderCurrentPage();
 
                     // 更新分页信息
-                    currentPage = data.page;
-                    const totalPages = data.totalPages;
+                    currentPage = data.page || 1;
+                    const totalPages = Math.ceil(allMappings.length / pageSize);
                     document.getElementById('currentPage').textContent = currentPage;
                     document.getElementById('prevPage').disabled = currentPage === 1;
-                    document.getElementById('nextPage').disabled = currentPage === totalPages;
+                    document.getElementById('nextPage').disabled = currentPage >= totalPages;
+
+                    // 设置页面大小选择器的当前值
+                    document.getElementById('pageSize').value = pageSize;
 
                 } catch (error) {
                     console.error('加载数据失败:', error);
@@ -1114,8 +1148,13 @@
                     { text: mapping.expiry || '永久有效', data: mapping.expiry || '' }
                 ];
 
-                cellsData.forEach(({ text, data }) => {
+                cellsData.forEach(({ text, data }, index) => {
                     const cell = document.createElement('td');
+                    if (index === 2) { // 目标URL单元格
+                        cell.classList.add('whitespace-normal', 'break-words', 'max-w-xs');
+                        cell.style.wordBreak = 'break-all';
+                        cell.style.minWidth = '200px';
+                    }
                     cell.textContent = text;
                     cell.dataset.original = data;
                     row.appendChild(cell);
@@ -1187,7 +1226,7 @@
                     // 切换到编辑模式
                     cells[0].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.name}">`;
                     cells[1].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.path}">`;
-                    cells[2].innerHTML = `<input type="text" class="input input-bordered input-sm w-full" value="${currentData.target}">`;
+                    cells[2].innerHTML = `<textarea class="textarea textarea-bordered textarea-sm w-full h-24" style="resize:none; word-break:break-all;">${currentData.target}</textarea>`;
                     cells[3].innerHTML = `<input type="date" class="input input-bordered input-sm w-full" value="${currentData.expiry}">`;
                     cells[4].innerHTML = `
                         <div class="flex flex-col gap-2">
@@ -1228,7 +1267,7 @@
 
                 const newName = cells[0].querySelector('input').value;
                 const newPath = cells[1].querySelector('input').value;
-                const newTarget = cells[2].querySelector('input').value;
+                const newTarget = cells[2].querySelector('textarea').value;
                 const newExpiry = cells[3].querySelector('input').value;
                 const enabledToggle = cells[4].querySelector('input[type="checkbox"]');
                 const isWechatToggle = cells[4].querySelectorAll('input[type="checkbox"]')[1];
@@ -1433,6 +1472,34 @@
             let currentPage = 1;
             let pageSize = 10;
 
+            // 添加分页和每页显示数量的事件监听器
+            document.getElementById('nextPage').addEventListener('click', () => {
+                currentPage++;
+                renderCurrentPage();
+                document.getElementById('currentPage').textContent = currentPage;
+                document.getElementById('prevPage').disabled = currentPage === 1;
+                document.getElementById('nextPage').disabled = currentPage >= Math.ceil(allMappings.length / pageSize);
+            });
+
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderCurrentPage();
+                    document.getElementById('currentPage').textContent = currentPage;
+                    document.getElementById('prevPage').disabled = currentPage === 1;
+                    document.getElementById('nextPage').disabled = currentPage >= Math.ceil(allMappings.length / pageSize);
+                }
+            });
+
+            document.getElementById('pageSize').addEventListener('change', (e) => {
+                pageSize = parseInt(e.target.value);
+                currentPage = 1;
+                renderCurrentPage();
+                document.getElementById('currentPage').textContent = currentPage;
+                document.getElementById('prevPage').disabled = true;
+                document.getElementById('nextPage').disabled = currentPage >= Math.ceil(allMappings.length / pageSize);
+            });
+
             async function logout() {
                 try {
                     const response = await fetch('/api/logout', {
@@ -1480,18 +1547,22 @@
                     allMappings = mappings.map(m => [m.path, {
                         name: m.name,
                         target: m.target,
-                        expiry: m.expiry
+                        expiry: m.expiry,
+                        enabled: m.enabled,
+                        isWechat: m.isWechat
                     }]);
 
                     // 等待一小段时间再更新DOM
                     await new Promise(resolve => setTimeout(resolve, 300));
 
-                    // 更新分页信息
+                    // 重置分页到第一页
                     currentPage = 1;
+
+                    // 更新分页信息
                     const totalPages = Math.ceil(allMappings.length / pageSize);
                     document.getElementById('currentPage').textContent = currentPage;
                     document.getElementById('prevPage').disabled = currentPage === 1;
-                    document.getElementById('nextPage').disabled = currentPage === totalPages;
+                    document.getElementById('nextPage').disabled = currentPage >= totalPages || allMappings.length === 0;
 
                     // 清空并重新渲染表格
                     renderCurrentPage();
