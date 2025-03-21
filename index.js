@@ -1,4 +1,5 @@
 let KV_BINDING;
+let DB;
 const banPath = [
   'login', 'admin', '__total_count',
   // static files
@@ -8,6 +9,22 @@ const banPath = [
   'robots.txt', 'wechat.svg',
   'favicon.svg',
 ];
+
+// 数据库初始化
+async function initDatabase() {
+  await DB.prepare(`
+    CREATE TABLE IF NOT EXISTS mappings (
+      path TEXT PRIMARY KEY,
+      target TEXT NOT NULL,
+      name TEXT,
+      expiry TEXT,
+      enabled INTEGER DEFAULT 1,
+      is_wechat INTEGER DEFAULT 0,
+      qr_code_data TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+}
 
 // Cookie 相关函数
 function verifyAuthCookie(request, env) {
@@ -31,87 +48,45 @@ function clearAuthCookie() {
   };
 }
 
-// KV 操作相关函数
+// 数据库操作相关函数
 async function listMappings(page = 1, pageSize = 10) {
-  const TOTAL_COUNT_KEY = "__total_count";
-  let count;
+  const offset = (page - 1) * pageSize;
+  
+  // 获取总数（排除 banPath）
+  const countResult = await DB.prepare(`
+    SELECT COUNT(*) as count 
+    FROM mappings 
+    WHERE path NOT IN (${banPath.map(() => '?').join(',')})
+  `).bind(...banPath).first();
+  
+  const total = countResult.count;
 
-  try {
-    count = await KV_BINDING.get(TOTAL_COUNT_KEY, { type: "json" });
-  } catch (e) {
-    count = null;
-  }
+  // 获取分页数据
+  const results = await DB.prepare(`
+    SELECT * FROM mappings 
+    WHERE path NOT IN (${banPath.map(() => '?').join(',')})
+    ORDER BY created_at DESC
+    LIMIT ? OFFSET ?
+  `).bind(...banPath, pageSize, offset).all();
 
   const mappings = {};
-  const skip = (page - 1) * pageSize;
-  let validCount = 0;  // 用于记录有效的映射数量
-
-  if (page === 1 || skip < 100) {
-    let cursor = null;
-    let processedCount = 0;
-
-    do {
-      const listResult = await KV_BINDING.list({ cursor, limit: Math.min(1000, skip + pageSize) });
-
-      for (const key of listResult.keys) {
-        // 跳过 banPath 中的路径
-        if (!banPath.includes(key.name)) {
-          if (processedCount >= skip && Object.keys(mappings).length < pageSize) {
-            const value = await KV_BINDING.get(key.name, { type: "json" });
-            mappings[key.name] = value;
-          }
-          processedCount++;
-        }
-      }
-
-      cursor = listResult.cursor;
-      if (count === null && cursor) {
-        const remaining = await KV_BINDING.list({ cursor, limit: 1000 });
-        // 计算剩余有效记录数（排除 banPath）
-        processedCount += remaining.keys.filter(key => !banPath.includes(key.name)).length;
-        cursor = remaining.cursor;
-      }
-    } while (cursor && Object.keys(mappings).length < pageSize);
-
-    if (count === null) {
-      count = processedCount;
-      await KV_BINDING.put(TOTAL_COUNT_KEY, JSON.stringify(count));
-    }
-  } else {
-    let cursor = null;
-    const batchSize = 1000;
-    let validSkip = skip;
-    let processedValid = 0;
-
-    // 继续获取数据直到找到足够的有效记录
-    while (processedValid < validSkip + pageSize) {
-      const listResult = await KV_BINDING.list({ cursor, limit: batchSize });
-
-      // 过滤掉 banPath 中的路径
-      const validKeys = listResult.keys.filter(key => !banPath.includes(key.name));
-
-      // 如果已经跳过了足够的记录，开始收集数据
-      if (processedValid + validKeys.length > validSkip) {
-        const startIndex = validSkip - processedValid;
-        for (let i = startIndex; i < validKeys.length && Object.keys(mappings).length < pageSize; i++) {
-          const value = await KV_BINDING.get(validKeys[i].name, { type: "json" });
-          mappings[validKeys[i].name] = value;
-        }
-      }
-
-      processedValid += validKeys.length;
-      cursor = listResult.cursor;
-
-      if (!cursor) break;
-    }
+  for (const row of results.results) {
+    mappings[row.path] = {
+      target: row.target,
+      name: row.name,
+      expiry: row.expiry,
+      enabled: row.enabled === 1,
+      isWechat: row.is_wechat === 1,
+      qrCodeData: row.qr_code_data
+    };
   }
 
   return {
     mappings,
-    total: count,
+    total,
     page,
     pageSize,
-    totalPages: Math.ceil(count / pageSize)
+    totalPages: Math.ceil(total / pageSize)
   };
 }
 
@@ -134,17 +109,18 @@ async function createMapping(path, target, name, expiry, enabled = true, isWecha
     throw new Error('微信二维码必须提供原始二维码数据');
   }
 
-  const mapping = {
+  await DB.prepare(`
+    INSERT INTO mappings (path, target, name, expiry, enabled, is_wechat, qr_code_data)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    path,
     target,
-    name: name || null,
-    expiry: expiry || null,
-    enabled: enabled,
-    isWechat: isWechat,
-    qrCodeData: qrCodeData
-  };
-
-  await KV_BINDING.put(path, JSON.stringify(mapping));
-  await updateTotalCount(1);
+    name || null,
+    expiry || null,
+    enabled ? 1 : 0,
+    isWechat ? 1 : 0,
+    qrCodeData
+  ).run();
 }
 
 async function deleteMapping(path) {
@@ -157,8 +133,7 @@ async function deleteMapping(path) {
     throw new Error('系统保留的短链名无法删除');
   }
 
-  await KV_BINDING.delete(path);
-  await updateTotalCount(-1);
+  await DB.prepare('DELETE FROM mappings WHERE path = ?').bind(path).run();
 }
 
 async function updateMapping(originalPath, newPath, target, name, expiry, enabled = true, isWechat = false, qrCodeData = null) {
@@ -180,21 +155,22 @@ async function updateMapping(originalPath, newPath, target, name, expiry, enable
     throw new Error('微信二维码必须提供原始二维码数据');
   }
 
-  if (originalPath !== newPath) {
-    await KV_BINDING.delete(originalPath);
-  }
+  const stmt = DB.prepare(`
+    UPDATE mappings 
+    SET path = ?, target = ?, name = ?, expiry = ?, enabled = ?, is_wechat = ?, qr_code_data = ?
+    WHERE path = ?
+  `);
 
-  const mapping = {
+  await stmt.bind(
+    newPath,
     target,
-    name: name || null,
-    expiry: expiry || null,
-    enabled: enabled,
-    isWechat: isWechat,
-    qrCodeData: qrCodeData
-  };
-
-  await KV_BINDING.put(newPath, JSON.stringify(mapping));
-  await updateTotalCount(1);
+    name || null,
+    expiry || null,
+    enabled ? 1 : 0,
+    isWechat ? 1 : 0,
+    qrCodeData,
+    originalPath
+  ).run();
 }
 
 async function getExpiringMappings() {
@@ -202,54 +178,82 @@ async function getExpiringMappings() {
     expiring: [],  // 2天内过期
     expired: []    // 已过期
   };
-  let cursor = null;
-  const twoDaysFromNow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
-  const now = new Date();
 
-  do {
-    const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
+  const twoDaysFromNow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+  const now = new Date().toISOString();
 
-    for (const key of listResult.keys) {
-      const mapping = await KV_BINDING.get(key.name, { type: "json" });
-      if (mapping && mapping.expiry) {
-        const expiryDate = new Date(mapping.expiry);
-        const mappingInfo = {
-          path: key.name,
-          name: mapping.name,
-          target: mapping.target,
-          expiry: mapping.expiry
-        };
+  // 获取已过期的映射
+  const expiredResults = await DB.prepare(`
+    SELECT path, name, target, expiry 
+    FROM mappings 
+    WHERE expiry IS NOT NULL AND expiry < ?
+    ORDER BY expiry ASC
+  `).bind(now).all();
 
-        if (expiryDate < now) {
-          mappings.expired.push(mappingInfo);
-        } else if (expiryDate <= twoDaysFromNow) {
-          mappings.expiring.push(mappingInfo);
-        }
-      }
-    }
+  // 获取即将过期的映射
+  const expiringResults = await DB.prepare(`
+    SELECT path, name, target, expiry 
+    FROM mappings 
+    WHERE expiry IS NOT NULL AND expiry >= ? AND expiry <= ?
+    ORDER BY expiry ASC
+  `).bind(now, twoDaysFromNow).all();
 
-    cursor = listResult.cursor;
-  } while (cursor);
+  mappings.expired = expiredResults.results.map(row => ({
+    path: row.path,
+    name: row.name,
+    target: row.target,
+    expiry: row.expiry
+  }));
+
+  mappings.expiring = expiringResults.results.map(row => ({
+    path: row.path,
+    name: row.name,
+    target: row.target,
+    expiry: row.expiry
+  }));
 
   return mappings;
 }
 
-// 在创建、更新、删除操作后更新总数缓存
-async function updateTotalCount(change = 0) {
-  const TOTAL_COUNT_KEY = "__total_count";
-  try {
-    const currentCount = await KV_BINDING.get(TOTAL_COUNT_KEY, { type: "json" });
-    if (currentCount !== null) {
-      await KV_BINDING.put(TOTAL_COUNT_KEY, JSON.stringify(currentCount + change));
+// 数据迁移函数
+async function migrateFromKV() {
+  let cursor = null;
+  do {
+    const listResult = await KV_BINDING.list({ cursor, limit: 1000 });
+    
+    for (const key of listResult.keys) {
+      if (!banPath.includes(key.name)) {
+        const value = await KV_BINDING.get(key.name, { type: "json" });
+        if (value) {
+          try {
+            await createMapping(
+              key.name,
+              value.target,
+              value.name,
+              value.expiry,
+              value.enabled,
+              value.isWechat,
+              value.qrCodeData
+            );
+          } catch (e) {
+            console.error(`Failed to migrate ${key.name}:`, e);
+          }
+        }
+      }
     }
-  } catch (e) {
-    // 如果缓存不存在或出错，忽略更新
-  }
+    
+    cursor = listResult.cursor;
+  } while (cursor);
 }
 
 export default {
   async fetch(request, env) {
     KV_BINDING = env.KV_BINDING;
+    DB = env.DB;
+    
+    // 初始化数据库
+    await initDatabase();
+    
     const url = new URL(request.url);
     const path = url.pathname.slice(1);
 
@@ -317,7 +321,11 @@ export default {
               });
             }
 
-            const mapping = await KV_BINDING.get(mappingPath, { type: "json" });
+            const mapping = await DB.prepare(`
+              SELECT path, target, name, expiry, enabled, is_wechat, qr_code_data
+              FROM mappings
+              WHERE path = ?
+            `).bind(mappingPath).first();
             if (!mapping) {
               return new Response(JSON.stringify({ error: 'Mapping not found' }), {
                 status: 404,
@@ -382,7 +390,11 @@ export default {
     // URL 重定向处理
     if (path) {
       try {
-        const mapping = await KV_BINDING.get(path, { type: "json" });
+        const mapping = await DB.prepare(`
+          SELECT path, target, name, expiry, enabled, is_wechat, qr_code_data
+          FROM mappings
+          WHERE path = ?
+        `).bind(path).first();
         if (mapping) {
           // 检查是否启用
           if (!mapping.enabled) {
@@ -391,12 +403,12 @@ export default {
 
           // 检查是否过期
           if (mapping.expiry && new Date(mapping.expiry) < new Date()) {
-            await KV_BINDING.delete(path);
+            await DB.prepare('DELETE FROM mappings WHERE path = ?').bind(path).run();
             return new Response('Not Found', { status: 404 });
           }
 
           // 如果是微信二维码，返回活码页面
-          if (mapping.isWechat && mapping.qrCodeData) {
+          if (mapping.is_wechat === 1 && mapping.qr_code_data) {
             const wechatHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -484,7 +496,7 @@ export default {
         <img class="wechat-icon" src="wechat.svg" alt="WeChat">
         <h1 class="title">${mapping.name ? mapping.name : '微信二维码'}</h1>
         <p class="notice">请长按识别下方二维码</p>
-        <img class="qr-code" src="${mapping.qrCodeData}" alt="微信群二维码">
+        <img class="qr-code" src="${mapping.qr_code_data}" alt="微信群二维码">
         <p class="footer">二维码失效请联系作者更新</p>
     </div>
 </body>
@@ -510,6 +522,11 @@ export default {
 
   async scheduled(controller, env, ctx) {
     KV_BINDING = env.KV_BINDING;
+    DB = env.DB;
+    
+    // 初始化数据库
+    await initDatabase();
+    
     const result = await getExpiringMappings();
 
     console.log(`Cron job report: Found ${result.expired.length} expired mappings`);
