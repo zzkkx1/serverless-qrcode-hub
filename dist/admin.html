@@ -942,7 +942,7 @@
 
                     const data = await response.json();
                     allMappings = Object.entries(data.mappings);
-
+                    
                     // 等待一小段时间再更新DOM
                     await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -950,10 +950,10 @@
                     renderCurrentPage();
 
                     // 更新分页信息
-                    currentPage = data.page || 1;
-                    const totalPages = Math.ceil(allMappings.length / pageSize);
+                    currentPage = data.page;
+                    const totalPages = data.totalPages;
                     document.getElementById('currentPage').textContent = currentPage;
-                    document.getElementById('prevPage').disabled = currentPage === 1;
+                    document.getElementById('prevPage').disabled = currentPage <= 1;
                     document.getElementById('nextPage').disabled = currentPage >= totalPages;
 
                     // 设置页面大小选择器的当前值
@@ -976,11 +976,8 @@
 
                 const fragment = document.createDocumentFragment();
 
-                const start = (currentPage - 1) * pageSize;
-                const end = Math.min(start + pageSize, allMappings.length);
-
-                for (let i = start; i < end; i++) {
-                    const [path, mapping] = allMappings[i];
+                // 直接遍历所有映射
+                for (const [path, mapping] of allMappings) {
                     const row = createMappingRow(path, mapping);
                     fragment.appendChild(row);
                 }
@@ -1536,21 +1533,15 @@
             let pageSize = 10;
 
             // 添加分页和每页显示数量的事件监听器
-            document.getElementById('nextPage').addEventListener('click', () => {
+            document.getElementById('nextPage').addEventListener('click', async () => {
                 currentPage++;
-                renderCurrentPage();
-                document.getElementById('currentPage').textContent = currentPage;
-                document.getElementById('prevPage').disabled = currentPage === 1;
-                document.getElementById('nextPage').disabled = currentPage >= Math.ceil(allMappings.length / pageSize);
+                await loadMappings();
             });
 
-            document.getElementById('prevPage').addEventListener('click', () => {
+            document.getElementById('prevPage').addEventListener('click', async () => {
                 if (currentPage > 1) {
                     currentPage--;
-                    renderCurrentPage();
-                    document.getElementById('currentPage').textContent = currentPage;
-                    document.getElementById('prevPage').disabled = currentPage === 1;
-                    document.getElementById('nextPage').disabled = currentPage >= Math.ceil(allMappings.length / pageSize);
+                    await loadMappings();
                 }
             });
 
@@ -1569,10 +1560,6 @@
                 } else {
                     await loadMappings();
                 }
-                
-                document.getElementById('currentPage').textContent = currentPage;
-                document.getElementById('prevPage').disabled = true;
-                document.getElementById('nextPage').disabled = currentPage >= Math.ceil(allMappings.length / pageSize);
             });
 
             async function logout() {

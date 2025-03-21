@@ -235,9 +235,6 @@ async function getExpiringMappings() {
     expiring: [],
     expired: []
   };
-
-  // 批量处理过期的映射
-  const expiredPaths = [];
   
   for (const row of results.results) {
     const mapping = {
@@ -252,19 +249,9 @@ async function getExpiringMappings() {
 
     if (row.status === 'expired') {
       mappings.expired.push(mapping);
-      expiredPaths.push(row.path);
     } else {
       mappings.expiring.push(mapping);
     }
-  }
-
-  // 如果有过期的映射，批量删除它们
-  if (expiredPaths.length > 0) {
-    const placeholders = expiredPaths.map(() => '?').join(',');
-    await DB.prepare(`
-      DELETE FROM mappings 
-      WHERE path IN (${placeholders})
-    `).bind(...expiredPaths).run();
   }
 
   return mappings;
@@ -491,7 +478,6 @@ export default {
 
           // 检查是否过期
           if (mapping.expiry && new Date(mapping.expiry) < new Date()) {
-            await DB.prepare('DELETE FROM mappings WHERE path = ?').bind(path).run();
             return new Response('Not Found', { status: 404 });
           }
 
