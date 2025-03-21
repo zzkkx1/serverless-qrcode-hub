@@ -24,6 +24,20 @@ async function initDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `).run();
+
+  // 添加索引
+  await DB.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_expiry ON mappings(expiry)
+  `).run();
+
+  await DB.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_created_at ON mappings(created_at)
+  `).run();
+
+  // 组合索引：用于启用状态和过期时间的组合查询
+  await DB.prepare(`
+    CREATE INDEX IF NOT EXISTS idx_enabled_expiry ON mappings(enabled, expiry)
+  `).run();
 }
 
 // Cookie 相关函数
@@ -52,24 +66,33 @@ function clearAuthCookie() {
 async function listMappings(page = 1, pageSize = 10) {
   const offset = (page - 1) * pageSize;
   
-  // 获取总数（排除 banPath）
-  const countResult = await DB.prepare(`
-    SELECT COUNT(*) as count 
-    FROM mappings 
-    WHERE path NOT IN (${banPath.map(() => '?').join(',')})
-  `).bind(...banPath).first();
-  
-  const total = countResult.count;
-
-  // 获取分页数据
+  // 使用单个查询获取分页数据和总数
   const results = await DB.prepare(`
-    SELECT * FROM mappings 
-    WHERE path NOT IN (${banPath.map(() => '?').join(',')})
+    WITH filtered_mappings AS (
+      SELECT * FROM mappings 
+      WHERE path NOT IN (${banPath.map(() => '?').join(',')})
+    )
+    SELECT 
+      filtered.*,
+      (SELECT COUNT(*) FROM filtered_mappings) as total_count
+    FROM filtered_mappings as filtered
     ORDER BY created_at DESC
     LIMIT ? OFFSET ?
   `).bind(...banPath, pageSize, offset).all();
 
+  if (!results.results || results.results.length === 0) {
+    return {
+      mappings: {},
+      total: 0,
+      page,
+      pageSize,
+      totalPages: 0
+    };
+  }
+
+  const total = results.results[0].total_count;
   const mappings = {};
+
   for (const row of results.results) {
     mappings[row.path] = {
       target: row.target,
@@ -150,7 +173,20 @@ async function updateMapping(originalPath, newPath, target, name, expiry, enable
     throw new Error('Invalid expiry date');
   }
 
-  // 如果是微信二维码，必须提供二维码数据
+  // 如果没有提供新的二维码数据，获取原有的二维码数据
+  if (!qrCodeData && isWechat) {
+    const existingMapping = await DB.prepare(`
+      SELECT qr_code_data
+      FROM mappings
+      WHERE path = ?
+    `).bind(originalPath).first();
+
+    if (existingMapping) {
+      qrCodeData = existingMapping.qr_code_data;
+    }
+  }
+
+  // 如果是微信二维码，必须有二维码数据
   if (isWechat && !qrCodeData) {
     throw new Error('微信二维码必须提供原始二维码数据');
   }
@@ -174,49 +210,97 @@ async function updateMapping(originalPath, newPath, target, name, expiry, enable
 }
 
 async function getExpiringMappings() {
-  const mappings = {
-    expiring: [],  // 2天内过期
-    expired: []    // 已过期
-  };
-
   const twoDaysFromNow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
   const now = new Date().toISOString();
 
-  // 获取已过期的映射
-  const expiredResults = await DB.prepare(`
-    SELECT path, name, target, expiry, enabled, is_wechat 
-    FROM mappings 
-    WHERE expiry IS NOT NULL AND expiry < ?
+  // 使用单个查询获取所有过期和即将过期的映射
+  const results = await DB.prepare(`
+    WITH categorized_mappings AS (
+      SELECT 
+        path, name, target, expiry, enabled, is_wechat, qr_code_data,
+        CASE 
+          WHEN expiry < ? THEN 'expired'
+          WHEN expiry <= ? THEN 'expiring'
+        END as status
+      FROM mappings 
+      WHERE expiry IS NOT NULL 
+        AND expiry <= ? 
+        AND enabled = 1
+    )
+    SELECT * FROM categorized_mappings
     ORDER BY expiry ASC
-  `).bind(now).all();
+  `).bind(now, twoDaysFromNow, twoDaysFromNow).all();
 
-  // 获取即将过期的映射
-  const expiringResults = await DB.prepare(`
-    SELECT path, name, target, expiry, enabled, is_wechat 
-    FROM mappings 
-    WHERE expiry IS NOT NULL AND expiry >= ? AND expiry <= ?
-    ORDER BY expiry ASC
-  `).bind(now, twoDaysFromNow).all();
+  const mappings = {
+    expiring: [],
+    expired: []
+  };
 
-  mappings.expired = expiredResults.results.map(row => ({
-    path: row.path,
-    name: row.name,
-    target: row.target,
-    expiry: row.expiry,
-    enabled: row.enabled === 1,
-    isWechat: row.is_wechat === 1
-  }));
+  // 批量处理过期的映射
+  const expiredPaths = [];
+  
+  for (const row of results.results) {
+    const mapping = {
+      path: row.path,
+      name: row.name,
+      target: row.target,
+      expiry: row.expiry,
+      enabled: row.enabled === 1,
+      isWechat: row.is_wechat === 1,
+      qrCodeData: row.qr_code_data
+    };
 
-  mappings.expiring = expiringResults.results.map(row => ({
-    path: row.path,
-    name: row.name,
-    target: row.target,
-    expiry: row.expiry,
-    enabled: row.enabled === 1,
-    isWechat: row.is_wechat === 1
-  }));
+    if (row.status === 'expired') {
+      mappings.expired.push(mapping);
+      expiredPaths.push(row.path);
+    } else {
+      mappings.expiring.push(mapping);
+    }
+  }
+
+  // 如果有过期的映射，批量删除它们
+  if (expiredPaths.length > 0) {
+    const placeholders = expiredPaths.map(() => '?').join(',');
+    await DB.prepare(`
+      DELETE FROM mappings 
+      WHERE path IN (${placeholders})
+    `).bind(...expiredPaths).run();
+  }
 
   return mappings;
+}
+
+// 添加新的批量清理过期映射的函数
+async function cleanupExpiredMappings(batchSize = 100) {
+  const now = new Date().toISOString();
+  
+  while (true) {
+    // 获取一批过期的映射
+    const batch = await DB.prepare(`
+      SELECT path 
+      FROM mappings 
+      WHERE expiry IS NOT NULL 
+        AND expiry < ? 
+      LIMIT ?
+    `).bind(now, batchSize).all();
+
+    if (!batch.results || batch.results.length === 0) {
+      break;
+    }
+
+    // 批量删除这些映射
+    const paths = batch.results.map(row => row.path);
+    const placeholders = paths.map(() => '?').join(',');
+    await DB.prepare(`
+      DELETE FROM mappings 
+      WHERE path IN (${placeholders})
+    `).bind(...paths).run();
+
+    // 如果获取的数量小于 batchSize，说明已经处理完所有过期映射
+    if (batch.results.length < batchSize) {
+      break;
+    }
+  }
 }
 
 // 数据迁移函数
@@ -531,6 +615,10 @@ export default {
     // 初始化数据库
     await initDatabase();
     
+    // 先清理过期的映射
+    await cleanupExpiredMappings(100);
+    
+    // 获取过期和即将过期的映射报告
     const result = await getExpiringMappings();
 
     console.log(`Cron job report: Found ${result.expired.length} expired mappings`);
