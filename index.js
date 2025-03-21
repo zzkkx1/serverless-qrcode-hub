@@ -12,6 +12,7 @@ const banPath = [
 
 // 数据库初始化
 async function initDatabase() {
+  // 创建表
   await DB.prepare(`
     CREATE TABLE IF NOT EXISTS mappings (
       path TEXT PRIMARY KEY,
@@ -19,11 +20,29 @@ async function initDatabase() {
       name TEXT,
       expiry TEXT,
       enabled INTEGER DEFAULT 1,
-      isWechat INTEGER DEFAULT 0,
-      qrCodeData TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `).run();
+
+  // 检查是否需要添加新列
+  const tableInfo = await DB.prepare("PRAGMA table_info(mappings)").all();
+  const columns = tableInfo.results.map(col => col.name);
+
+  // 添加 isWechat 列（如果不存在）
+  if (!columns.includes('isWechat')) {
+    await DB.prepare(`
+      ALTER TABLE mappings 
+      ADD COLUMN isWechat INTEGER DEFAULT 0
+    `).run();
+  }
+
+  // 添加 qrCodeData 列（如果不存在）
+  if (!columns.includes('qrCodeData')) {
+    await DB.prepare(`
+      ALTER TABLE mappings 
+      ADD COLUMN qrCodeData TEXT
+    `).run();
+  }
 
   // 添加索引
   await DB.prepare(`
