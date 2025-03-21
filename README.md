@@ -1,6 +1,8 @@
 # serverless-qrcode-hub
 
-苦于微信群聊二维码频繁变动，开发这个能生成永久二维码的工具，**不需要服务器**。基于 Cloudflare Workers 和 KV 存储实现。
+苦于微信群聊二维码频繁变动，开发这个能生成永久二维码的工具，**不需要服务器**。基于 Cloudflare Workers 和 D1 实现。
+
+> KV 的免费额度太少，新版本改为基于 D1 存储，基于 KV 的版本请查看 [README.v1.md](./README.v1.md)
 
 ## 功能特性
 
