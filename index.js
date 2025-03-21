@@ -184,7 +184,7 @@ async function getExpiringMappings() {
 
   // 获取已过期的映射
   const expiredResults = await DB.prepare(`
-    SELECT path, name, target, expiry 
+    SELECT path, name, target, expiry, enabled, is_wechat 
     FROM mappings 
     WHERE expiry IS NOT NULL AND expiry < ?
     ORDER BY expiry ASC
@@ -192,7 +192,7 @@ async function getExpiringMappings() {
 
   // 获取即将过期的映射
   const expiringResults = await DB.prepare(`
-    SELECT path, name, target, expiry 
+    SELECT path, name, target, expiry, enabled, is_wechat 
     FROM mappings 
     WHERE expiry IS NOT NULL AND expiry >= ? AND expiry <= ?
     ORDER BY expiry ASC
@@ -202,14 +202,18 @@ async function getExpiringMappings() {
     path: row.path,
     name: row.name,
     target: row.target,
-    expiry: row.expiry
+    expiry: row.expiry,
+    enabled: row.enabled === 1,
+    isWechat: row.is_wechat === 1
   }));
 
   mappings.expiring = expiringResults.results.map(row => ({
     path: row.path,
     name: row.name,
     target: row.target,
-    expiry: row.expiry
+    expiry: row.expiry,
+    enabled: row.enabled === 1,
+    isWechat: row.is_wechat === 1
   }));
 
   return mappings;

@@ -1554,10 +1554,22 @@
                 }
             });
 
-            document.getElementById('pageSize').addEventListener('change', (e) => {
+            document.getElementById('pageSize').addEventListener('change', async (e) => {
                 pageSize = parseInt(e.target.value);
                 currentPage = 1;
-                renderCurrentPage();
+                
+                // 根据当前视图状态重新加载数据
+                const expiringBtn = document.getElementById('showExpiringBtn');
+                const expiredBtn = document.getElementById('showExpiredBtn');
+                
+                if (expiringBtn.classList.contains('btn-warning')) {
+                    await loadExpiringMappings('expiring');
+                } else if (expiredBtn.classList.contains('btn-error')) {
+                    await loadExpiringMappings('expired');
+                } else {
+                    await loadMappings();
+                }
+                
                 document.getElementById('currentPage').textContent = currentPage;
                 document.getElementById('prevPage').disabled = true;
                 document.getElementById('nextPage').disabled = currentPage >= Math.ceil(allMappings.length / pageSize);
