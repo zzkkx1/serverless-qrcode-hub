@@ -49,13 +49,14 @@
 
 ## 使用步骤
 
-1. 登录 Cloudflare 并创建 KV 命名空间
+1. 登录 Cloudflare 并创建 D1 SQL 数据库
 
-   ![](./images/1.jpg)
+   ![](./images/1_1.png)
+   ![](./images/1_2.png)
 
-2. 复制 KV 命名空间 ID
+2. 复制 D1 SQL 数据库 ID
 
-   ![](./images/2.jpg)
+   ![](./images/2_1.png)
 
 3. 回到 GitHub 并 Fork 仓库
 
