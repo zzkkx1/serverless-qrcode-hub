@@ -64,11 +64,11 @@
 
 4. 在 GitHub 打开你 Fork 的仓库的 `wrangler.toml` 文件，点击图中的按钮编辑
 
-   ![](./images/4.jpg)
+   ![](./images/4_1.png)
 
-5. 将 `kv_namespaces` 下的 `id` 内容替换为你的 KV 命名空间 ID
+5. 将 `d1_databases` 下的 `database_id` 内容替换为你自己拷贝的 D1 SQL 数据库 ID
 
-   ![](./images/5.jpg)
+   ![](./images/5_1.png)
 
 6. 回到 Cloudflare 并创建 Worker
 
