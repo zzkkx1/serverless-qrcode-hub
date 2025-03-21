@@ -19,8 +19,8 @@ async function initDatabase() {
       name TEXT,
       expiry TEXT,
       enabled INTEGER DEFAULT 1,
-      is_wechat INTEGER DEFAULT 0,
-      qr_code_data TEXT,
+      isWechat INTEGER DEFAULT 0,
+      qrCodeData TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
   `).run();
@@ -99,8 +99,8 @@ async function listMappings(page = 1, pageSize = 10) {
       name: row.name,
       expiry: row.expiry,
       enabled: row.enabled === 1,
-      isWechat: row.is_wechat === 1,
-      qrCodeData: row.qr_code_data
+      isWechat: row.isWechat === 1,
+      qrCodeData: row.qrCodeData
     };
   }
 
@@ -133,7 +133,7 @@ async function createMapping(path, target, name, expiry, enabled = true, isWecha
   }
 
   await DB.prepare(`
-    INSERT INTO mappings (path, target, name, expiry, enabled, is_wechat, qr_code_data)
+    INSERT INTO mappings (path, target, name, expiry, enabled, isWechat, qrCodeData)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).bind(
     path,
@@ -176,13 +176,13 @@ async function updateMapping(originalPath, newPath, target, name, expiry, enable
   // 如果没有提供新的二维码数据，获取原有的二维码数据
   if (!qrCodeData && isWechat) {
     const existingMapping = await DB.prepare(`
-      SELECT qr_code_data
+      SELECT qrCodeData
       FROM mappings
       WHERE path = ?
     `).bind(originalPath).first();
 
     if (existingMapping) {
-      qrCodeData = existingMapping.qr_code_data;
+      qrCodeData = existingMapping.qrCodeData;
     }
   }
 
@@ -193,7 +193,7 @@ async function updateMapping(originalPath, newPath, target, name, expiry, enable
 
   const stmt = DB.prepare(`
     UPDATE mappings 
-    SET path = ?, target = ?, name = ?, expiry = ?, enabled = ?, is_wechat = ?, qr_code_data = ?
+    SET path = ?, target = ?, name = ?, expiry = ?, enabled = ?, isWechat = ?, qrCodeData = ?
     WHERE path = ?
   `);
 
@@ -217,7 +217,7 @@ async function getExpiringMappings() {
   const results = await DB.prepare(`
     WITH categorized_mappings AS (
       SELECT 
-        path, name, target, expiry, enabled, is_wechat, qr_code_data,
+        path, name, target, expiry, enabled, isWechat, qrCodeData,
         CASE 
           WHEN expiry < ? THEN 'expired'
           WHEN expiry <= ? THEN 'expiring'
@@ -246,8 +246,8 @@ async function getExpiringMappings() {
       target: row.target,
       expiry: row.expiry,
       enabled: row.enabled === 1,
-      isWechat: row.is_wechat === 1,
-      qrCodeData: row.qr_code_data
+      isWechat: row.isWechat === 1,
+      qrCodeData: row.qrCodeData
     };
 
     if (row.status === 'expired') {
@@ -410,7 +410,7 @@ export default {
             }
 
             const mapping = await DB.prepare(`
-              SELECT path, target, name, expiry, enabled, is_wechat, qr_code_data
+              SELECT path, target, name, expiry, enabled, isWechat, qrCodeData
               FROM mappings
               WHERE path = ?
             `).bind(mappingPath).first();
@@ -479,7 +479,7 @@ export default {
     if (path) {
       try {
         const mapping = await DB.prepare(`
-          SELECT path, target, name, expiry, enabled, is_wechat, qr_code_data
+          SELECT path, target, name, expiry, enabled, isWechat, qrCodeData
           FROM mappings
           WHERE path = ?
         `).bind(path).first();
@@ -496,7 +496,7 @@ export default {
           }
 
           // 如果是微信二维码，返回活码页面
-          if (mapping.is_wechat === 1 && mapping.qr_code_data) {
+          if (mapping.isWechat === 1 && mapping.qrCodeData) {
             const wechatHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -584,7 +584,7 @@ export default {
         <img class="wechat-icon" src="wechat.svg" alt="WeChat">
         <h1 class="title">${mapping.name ? mapping.name : '微信二维码'}</h1>
         <p class="notice">请长按识别下方二维码</p>
-        <img class="qr-code" src="${mapping.qr_code_data}" alt="微信群二维码">
+        <img class="qr-code" src="${mapping.qrCodeData}" alt="微信群二维码">
         <p class="footer">二维码失效请联系作者更新</p>
     </div>
 </body>

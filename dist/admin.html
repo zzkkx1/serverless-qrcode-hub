@@ -1297,7 +1297,7 @@
                                     <span class="label-text">启用</span>
                                 </label>
                                 <label class="cursor-pointer label justify-start gap-2">
-                                    <input type="checkbox" class="toggle toggle-primary toggle-sm" ${mappingData.is_wechat ? 'checked' : ''}>
+                                    <input type="checkbox" class="toggle toggle-primary toggle-sm" ${mappingData.isWechat ? 'checked' : ''}>
                                     <span class="label-text">微信</span>
                                 </label>
                             </div>
@@ -1373,7 +1373,7 @@
                             expiry: newExpiry || null,
                             enabled: newEnabled,
                             isWechat: newIsWechat,
-                            qrCodeData: serverData.qr_code_data // 使用服务器返回的原始二维码数据
+                            qrCodeData: serverData.qrCodeData // 使用服务器返回的原始二维码数据
                         })
                     });
 
