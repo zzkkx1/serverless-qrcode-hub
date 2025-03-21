@@ -1,26 +1,24 @@
 name = "serverless-qrcode-hub"
 main = "index.js"
-compatibility_date = "2025-03-15"
+compatibility_date = "2025-03-10"
 
-kv_namespaces = [
-    # 注意：将下面的 id 替换为你自己拷贝的 KV 命名空间 id 才能正常使用！
-    { binding = "KV_BINDING", id = "a68f3f09b7f14ba3b99dec5f33927545" },
-]
-
-[env.dev]
-kv_namespaces = [
-    { binding = "KV_BINDING", id = "91e94fe4c85d4e21a7f9898d97587e0e" },
-]
-
-[env.dev.triggers]
-crons = ["*/10 * * * * *"]
+[[d1_databases]]
+binding = "DB"
+database_name = "qrcode_hub"
+# 注意：将下面的 id 替换为你自己拷贝的 D1 存储的 id 才能正常使用！
+database_id = "your-database-id-here"
 
 [triggers]
 crons = ["0 2 */1 * *"]
 
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "qrcode_hub_dev"
+database_id = "1cfa1ef6-a076-410b-aa19-50f63411313c"
+
+[env.dev.triggers]
+crons = ["*/10 * * * * *"]
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-
-[observability.logs]
-enabled = true
