@@ -229,8 +229,12 @@ async function updateMapping(originalPath, newPath, target, name, expiry, enable
 }
 
 async function getExpiringMappings() {
-  const twoDaysFromNow = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
-  const now = new Date().toISOString();
+  // 修改为3天
+  const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+  // 使用当天23:59:59作为失效判断时间
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  const now = today.toISOString();
 
   // 使用单个查询获取所有过期和即将过期的映射
   const results = await DB.prepare(`
@@ -248,7 +252,7 @@ async function getExpiringMappings() {
     )
     SELECT * FROM categorized_mappings
     ORDER BY expiry ASC
-  `).bind(now, twoDaysFromNow, twoDaysFromNow).all();
+  `).bind(now, threeDaysFromNow, threeDaysFromNow).all();
 
   const mappings = {
     expiring: [],
@@ -495,9 +499,13 @@ export default {
             return new Response('Not Found', { status: 404 });
           }
 
-          // 检查是否过期
-          if (mapping.expiry && new Date(mapping.expiry) < new Date()) {
-            return new Response('Not Found', { status: 404 });
+          // 检查是否过期 - 使用当天23:59:59作为失效判断时间
+          if (mapping.expiry) {
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+            if (new Date(mapping.expiry) < today) {
+              return new Response('Not Found', { status: 404 });
+            }
           }
 
           // 如果是微信二维码，返回活码页面
