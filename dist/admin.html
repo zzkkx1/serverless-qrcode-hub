@@ -1149,6 +1149,18 @@
                 // 设置 URL 文本
                 urlInput.value = url;
 
+                // 从 localStorage 获取保存的设置
+                const savedShowLogo = localStorage.getItem('qr-show-logo');
+                const savedDotsStyle = localStorage.getItem('qr-dots-style');
+                
+                // 应用保存的设置
+                if (savedShowLogo !== null) {
+                    showLogoCheckbox.checked = savedShowLogo === 'true';
+                }
+                if (savedDotsStyle) {
+                    dotsStyleSelect.value = savedDotsStyle;
+                }
+
                 // 基础 QR 配置
                 const getQRConfig = (showLogo, dotsType) => ({
                     width: 300,
@@ -1193,6 +1205,10 @@
                         container.innerHTML = '';
                         currentQRCode = new QRCodeStyling(getQRConfig(showLogoCheckbox.checked, dotsStyleSelect.value));
                         currentQRCode.append(container);
+
+                        // 保存设置到 localStorage
+                        localStorage.setItem('qr-show-logo', showLogoCheckbox.checked);
+                        localStorage.setItem('qr-dots-style', dotsStyleSelect.value);
 
                         requestAnimationFrame(() => {
                             container.classList.remove('switching');
@@ -1697,6 +1713,89 @@
                 } finally {
                     skeleton.classList.add('hidden');
                     tableBody.style.display = '';
+                }
+            }
+
+            // 在页面加载时初始化二维码设置
+            document.addEventListener('DOMContentLoaded', function() {
+                // 初始化二维码设置
+                const savedShowLogo = localStorage.getItem('qr-show-logo');
+                const savedDotsStyle = localStorage.getItem('qr-dots-style');
+                
+                // 设置显示logo复选框
+                if (savedShowLogo !== null) {
+                    document.getElementById('qr-show-logo').checked = savedShowLogo === 'true';
+                }
+                
+                // 设置点样式下拉框
+                if (savedDotsStyle) {
+                    document.getElementById('qr-dots-style').value = savedDotsStyle;
+                }
+                
+                // 添加设置变更监听器
+                document.getElementById('qr-show-logo').addEventListener('change', function(e) {
+                    localStorage.setItem('qr-show-logo', e.target.checked);
+                    // 如果二维码已经显示，则更新二维码
+                    if (qrCode) {
+                        updateQRCode();
+                    }
+                });
+                
+                document.getElementById('qr-dots-style').addEventListener('change', function(e) {
+                    localStorage.setItem('qr-dots-style', e.target.value);
+                    // 如果二维码已经显示，则更新二维码
+                    if (qrCode) {
+                        updateQRCode();
+                    }
+                });
+            });
+
+            // 更新生成二维码的函数，使用保存的设置
+            function updateQRCode() {
+                const url = document.getElementById('qr-url').value;
+                const showLogo = document.getElementById('qr-show-logo').checked;
+                const dotsStyle = document.getElementById('qr-dots-style').value;
+                
+                const options = {
+                    width: 240,
+                    height: 240,
+                    data: url,
+                    margin: 10,
+                    qrOptions: {
+                        typeNumber: 0,
+                        mode: 'Byte',
+                        errorCorrectionLevel: 'H'
+                    },
+                    imageOptions: {
+                        hideBackgroundDots: true,
+                        imageSize: 0.4,
+                        margin: 4
+                    },
+                    dotsOptions: {
+                        type: dotsStyle,
+                        color: '#000000'
+                    },
+                    backgroundOptions: {
+                        color: '#ffffff'
+                    }
+                };
+
+                if (showLogo) {
+                    options.image = '/wechat.svg';
+                }
+
+                // 如果已经存在二维码实例，先移除旧的
+                if (qrCode) {
+                    const container = document.getElementById('qr-container');
+                    container.classList.add('switching');
+                    
+                    setTimeout(() => {
+                        qrCode.update(options);
+                        container.classList.remove('switching');
+                    }, 200);
+                } else {
+                    qrCode = new QRCodeStyling(options);
+                    qrCode.append(document.getElementById('qr-container'));
                 }
             }
 
