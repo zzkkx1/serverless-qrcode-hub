@@ -513,7 +513,87 @@ export default {
             const today = new Date();
             today.setHours(23, 59, 59, 999);
             if (new Date(mapping.expiry) < today) {
-              return new Response('Not Found', { status: 404 });
+              const expiredHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链接已过期</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+        }
+        body {
+            margin: 0;
+            padding: 16px;
+            min-height: 100vh;
+            display: flex;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f7f7f7;
+            box-sizing: border-box;
+        }
+        .container {
+            margin: auto;
+            padding: 24px 16px;
+            width: calc(100% - 32px);
+            max-width: 320px;
+            text-align: center;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .title {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0 0 16px;
+            color: #333;
+        }
+        .message {
+            font-size: 16px;
+            color: #666;
+            margin: 16px 0;
+            line-height: 1.5;
+        }
+        .info {
+            font-size: 14px;
+            color: #999;
+            margin-top: 20px;
+        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #1a1a1a;
+            }
+            .container {
+                background: #2a2a2a;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+            .title {
+                color: #e0e0e0;
+            }
+            .message {
+                color: #aaa;
+            }
+            .info {
+                color: #777;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">${mapping.name ? mapping.name + ' 已过期' : '链接已过期'}</h1>
+        <p class="info">过期时间：${new Date(mapping.expiry).toLocaleDateString()}</p>
+        <p class="info">如需访问，请联系管理员更新链接</p>
+    </div>
+</body>
+</html>`;
+              return new Response(expiredHtml, {
+                status: 404,
+                headers: {
+                  'Content-Type': 'text/html;charset=UTF-8',
+                  'Cache-Control': 'no-store'
+                }
+              });
             }
           }
 
