@@ -229,12 +229,21 @@ async function updateMapping(originalPath, newPath, target, name, expiry, enable
 }
 
 async function getExpiringMappings() {
-  // 修改为3天
-  const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-  // 使用当天23:59:59作为失效判断时间
+  // 获取今天的日期（设置为今天的23:59:59）
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   const now = today.toISOString();
+  
+  // 获取今天的开始时间（00:00:00）
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const dayStart = todayStart.toISOString();
+  
+  // 修改为3天后的23:59:59
+  const threeDaysFromNow = new Date(todayStart);
+  threeDaysFromNow.setDate(todayStart.getDate() + 3);
+  threeDaysFromNow.setHours(23, 59, 59, 999);
+  const threeDaysLater = threeDaysFromNow.toISOString();
 
   // 使用单个查询获取所有过期和即将过期的映射
   const results = await DB.prepare(`
@@ -242,17 +251,17 @@ async function getExpiringMappings() {
       SELECT 
         path, name, target, expiry, enabled, isWechat, qrCodeData,
         CASE 
-          WHEN expiry < ? THEN 'expired'
-          WHEN expiry <= ? THEN 'expiring'
+          WHEN datetime(expiry) < datetime(?) THEN 'expired'
+          WHEN datetime(expiry) <= datetime(?) THEN 'expiring'
         END as status
       FROM mappings 
       WHERE expiry IS NOT NULL 
-        AND expiry <= ? 
+        AND datetime(expiry) <= datetime(?) 
         AND enabled = 1
     )
     SELECT * FROM categorized_mappings
     ORDER BY expiry ASC
-  `).bind(now, threeDaysFromNow, threeDaysFromNow).all();
+  `).bind(dayStart, threeDaysLater, threeDaysLater).all();
 
   const mappings = {
     expiring: [],
