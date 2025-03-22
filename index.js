@@ -619,10 +619,7 @@ export default {
     
     // 初始化数据库
     await initDatabase();
-    
-    // 先清理过期的映射
-    await cleanupExpiredMappings(100);
-    
+        
     // 获取过期和即将过期的映射报告
     const result = await getExpiringMappings();
 
