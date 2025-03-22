@@ -636,19 +636,43 @@
                 }
 
                 // 修改筛选按钮的点击事件
-                document.getElementById('showAllBtn').addEventListener('click', () => {
-                    updateFilterButtonStates('showAllBtn');
-                    loadMappings();
+                document.getElementById('showAllBtn').addEventListener('click', async () => {
+                    currentPage = 1; // 重置页码
+                    const btn = document.getElementById('showAllBtn');
+                    const expiringBtn = document.getElementById('showExpiringBtn');
+                    const expiredBtn = document.getElementById('showExpiredBtn');
+                    
+                    btn.classList.add('btn-primary');
+                    expiringBtn.classList.remove('btn-warning');
+                    expiredBtn.classList.remove('btn-error');
+                    
+                    await loadMappings();
                 });
 
-                document.getElementById('showExpiringBtn').addEventListener('click', () => {
-                    updateFilterButtonStates('showExpiringBtn');
-                    loadExpiringMappings('expiring');
+                document.getElementById('showExpiringBtn').addEventListener('click', async () => {
+                    currentPage = 1; // 重置页码
+                    const btn = document.getElementById('showExpiringBtn');
+                    const allBtn = document.getElementById('showAllBtn');
+                    const expiredBtn = document.getElementById('showExpiredBtn');
+                    
+                    btn.classList.add('btn-warning');
+                    allBtn.classList.remove('btn-primary');
+                    expiredBtn.classList.remove('btn-error');
+                    
+                    await loadExpiringMappings('expiring');
                 });
 
-                document.getElementById('showExpiredBtn').addEventListener('click', () => {
-                    updateFilterButtonStates('showExpiredBtn');
-                    loadExpiringMappings('expired');
+                document.getElementById('showExpiredBtn').addEventListener('click', async () => {
+                    currentPage = 1; // 重置页码
+                    const btn = document.getElementById('showExpiredBtn');
+                    const allBtn = document.getElementById('showAllBtn');
+                    const expiringBtn = document.getElementById('showExpiringBtn');
+                    
+                    btn.classList.add('btn-error');
+                    allBtn.classList.remove('btn-primary');
+                    expiringBtn.classList.remove('btn-warning');
+                    
+                    await loadExpiringMappings('expired');
                 });
 
                 // 添加微信二维码开关事件监听
@@ -1534,14 +1558,33 @@
 
             // 添加分页和每页显示数量的事件监听器
             document.getElementById('nextPage').addEventListener('click', async () => {
+                const expiringBtn = document.getElementById('showExpiringBtn');
+                const expiredBtn = document.getElementById('showExpiredBtn');
+                
                 currentPage++;
-                await loadMappings();
+                
+                if (expiringBtn.classList.contains('btn-warning')) {
+                    await loadExpiringMappings('expiring');
+                } else if (expiredBtn.classList.contains('btn-error')) {
+                    await loadExpiringMappings('expired');
+                } else {
+                    await loadMappings();
+                }
             });
 
             document.getElementById('prevPage').addEventListener('click', async () => {
                 if (currentPage > 1) {
                     currentPage--;
-                    await loadMappings();
+                    const expiringBtn = document.getElementById('showExpiringBtn');
+                    const expiredBtn = document.getElementById('showExpiredBtn');
+                    
+                    if (expiringBtn.classList.contains('btn-warning')) {
+                        await loadExpiringMappings('expiring');
+                    } else if (expiredBtn.classList.contains('btn-error')) {
+                        await loadExpiringMappings('expired');
+                    } else {
+                        await loadMappings();
+                    }
                 }
             });
 
@@ -1591,49 +1634,67 @@
                 skeleton.classList.remove('hidden');
 
                 try {
-                    const response = await fetch('/api/expiring-mappings');
+                    const response = await fetch(`/api/expiring-mappings?page=${currentPage}&pageSize=${pageSize}`);
 
                     if (response.status === 401) {
                         window.location.href = '/login';
                         return;
                     }
 
-                    if (!response.ok) {
-                        throw new Error('加载数据失败');
-                    }
-
                     const data = await response.json();
-                    const mappings = data[type] || [];
-
-                    // 转换数据格式以适配现有的渲染逻辑
-                    allMappings = mappings.map(m => [m.path, {
-                        name: m.name,
-                        target: m.target,
-                        expiry: m.expiry,
-                        enabled: m.enabled,
-                        isWechat: m.isWechat
-                    }]);
-
-                    // 等待一小段时间再更新DOM
-                    await new Promise(resolve => setTimeout(resolve, 300));
-
-                    // 重置分页到第一页
-                    currentPage = 1;
+                    
+                    // 获取今天的日期（去除时间部分）
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    // 根据类型和过期时间筛选数据
+                    const mappingsArray = data[type];
+                    
+                    // 确保日期比较的准确性
+                    mappingsArray.forEach(mapping => {
+                        const expiryDate = new Date(mapping.expiry);
+                        expiryDate.setHours(0, 0, 0, 0); // 只比较日期部分
+                        mapping.isExpired = expiryDate < today;
+                    });
+                    
+                    // 根据类型过滤数据
+                    const filteredMappings = type === 'expired' 
+                        ? mappingsArray.filter(m => m.isExpired)
+                        : mappingsArray.filter(m => !m.isExpired);
+                        
+                    const total = filteredMappings.length;
+                    
+                    // 计算当前页的数据
+                    const start = (currentPage - 1) * pageSize;
+                    const end = Math.min(start + pageSize, total);
+                    const currentPageData = filteredMappings.slice(start, end);
+                    
+                    // 清空表格
+                    tableBody.innerHTML = '';
+                    
+                    // 渲染当前页数据
+                    currentPageData.forEach(mapping => {
+                        const row = createMappingRow(mapping.path, {
+                            name: mapping.name,
+                            target: mapping.target,
+                            expiry: mapping.expiry,
+                            enabled: mapping.enabled,
+                            isWechat: mapping.isWechat,
+                            qrCodeData: mapping.qrCodeData
+                        });
+                        tableBody.appendChild(row);
+                    });
 
                     // 更新分页信息
-                    const totalPages = Math.ceil(allMappings.length / pageSize);
+                    const totalPages = Math.ceil(total / pageSize);
                     document.getElementById('currentPage').textContent = currentPage;
-                    document.getElementById('prevPage').disabled = currentPage === 1;
-                    document.getElementById('nextPage').disabled = currentPage >= totalPages || allMappings.length === 0;
-
-                    // 清空并重新渲染表格
-                    renderCurrentPage();
+                    document.getElementById('prevPage').disabled = currentPage <= 1;
+                    document.getElementById('nextPage').disabled = currentPage >= totalPages || total === 0;
 
                 } catch (error) {
                     console.error('加载数据失败:', error);
                     showAlert('加载数据失败，请刷新页面重试');
                 } finally {
-                    // 隐藏骨架屏，显示表格内容
                     skeleton.classList.add('hidden');
                     tableBody.style.display = '';
                 }
